@@ -1,0 +1,652 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import { 
+  FaBuilding, 
+  FaPlus, 
+  FaEdit, 
+  FaTrash, 
+  FaEye,
+  FaSearch,
+  FaFilter,
+  FaUsers,
+  FaChartBar,
+  FaMapMarkerAlt,
+  FaPhone,
+  FaEnvelope,
+  FaChevronRight,
+  FaTimes
+} from 'react-icons/fa';
+import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const Departments = () => {
+  const {  isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    search: '',
+    isActive: 'true'
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [editingDept, setEditingDept] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    code: '',
+    description: '',
+    location: {
+      building: '',
+      floor: '',
+      office: ''
+    },
+    contactInfo: {
+      email: '',
+      phone: '',
+      extension: ''
+    },
+    settings: {
+      defaultLeaveQuota: {
+        annual: 20,
+        sick: 10,
+        personal: 5
+      }
+    }
+  });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pages: 1,
+    total: 0
+  });
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [filters, pagination.page]);
+
+  const fetchDepartments = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: pagination.page,
+        limit: 10,
+        includeStats: 'true',
+        ...(filters.search && { search: filters.search }),
+        ...(filters.isActive !== 'all' && { isActive: filters.isActive })
+      });
+
+      const response = await axios.get(`${API_URL}/departments?${params}`);
+      setDepartments(response.data.data);
+      setPagination(response.data.pagination);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      toast.error('Failed to fetch departments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name.includes('.')) {
+      const [parent, child, grandChild] = name.split('.');
+      if (grandChild) {
+        setFormData({
+          ...formData,
+          [parent]: {
+            ...formData[parent],
+            [child]: {
+              ...formData[parent]?.[child],
+              [grandChild]: value
+            }
+          }
+        });
+      } else {
+        setFormData({
+          ...formData,
+          [parent]: {
+            ...formData[parent],
+            [child]: value
+          }
+        });
+      }
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingDept) {
+        await axios.put(`${API_URL}/departments/${editingDept._id}`, formData);
+        toast.success('Department updated successfully');
+      } else {
+        await axios.post(`${API_URL}/departments`, formData);
+        toast.success('Department created successfully');
+      }
+      setShowModal(false);
+      resetForm();
+      fetchDepartments();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Operation failed');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this department?')) return;
+    
+    try {
+      await axios.delete(`${API_URL}/departments/${id}`);
+      toast.success('Department deleted successfully');
+      fetchDepartments();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete department');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      code: '',
+      description: '',
+      location: { building: '', floor: '', office: '' },
+      contactInfo: { email: '', phone: '', extension: '' },
+      settings: {
+        defaultLeaveQuota: { annual: 20, sick: 10, personal: 5 }
+      }
+    });
+    setEditingDept(null);
+  };
+
+  const openEditModal = (dept) => {
+    setEditingDept(dept);
+    setFormData({
+      name: dept.name || '',
+      code: dept.code || '',
+      description: dept.description || '',
+      location: dept.location || { building: '', floor: '', office: '' },
+      contactInfo: dept.contactInfo || { email: '', phone: '', extension: '' },
+      settings: dept.settings || {
+        defaultLeaveQuota: { annual: 20, sick: 10, personal: 5 }
+      }
+    });
+    setShowModal(true);
+  };
+
+  if (loading && departments.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
+          <p className="text-gray-600 mt-1">Manage organization departments and settings</p>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <FaPlus />
+            <span>Add Department</span>
+          </button>
+        )}
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card bg-blue-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-600 text-sm">Total Departments</p>
+              <p className="text-2xl font-bold text-blue-700">{pagination.total}</p>
+            </div>
+            <FaBuilding className="text-blue-500 text-3xl" />
+          </div>
+        </div>
+
+        <div className="card bg-green-50 border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-600 text-sm">Active Departments</p>
+              <p className="text-2xl font-bold text-green-700">
+                {departments.filter(d => d.isActive).length}
+              </p>
+            </div>
+            <FaBuilding className="text-green-500 text-3xl" />
+          </div>
+        </div>
+
+        <div className="card bg-purple-50 border-purple-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-600 text-sm">Total Employees</p>
+              <p className="text-2xl font-bold text-purple-700">
+                {departments.reduce((acc, dept) => acc + (dept.employeeCount || 0), 0)}
+              </p>
+            </div>
+            <FaUsers className="text-purple-500 text-3xl" />
+          </div>
+        </div>
+
+        <div className="card bg-orange-50 border-orange-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-orange-600 text-sm">Avg Department Size</p>
+              <p className="text-2xl font-bold text-orange-700">
+                {departments.length > 0 
+                  ? Math.round(departments.reduce((acc, dept) => acc + (dept.employeeCount || 0), 0) / departments.length)
+                  : 0}
+              </p>
+            </div>
+            <FaChartBar className="text-orange-500 text-3xl" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card">
+        <div className="flex items-center space-x-2 mb-4">
+          <FaFilter className="text-gray-500" />
+          <h2 className="text-lg font-semibold">Filters</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Search
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
+                <FaSearch className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                placeholder="Search by name or code..."
+                className="input-field pl-10"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={filters.isActive}
+              onChange={(e) => setFilters({ ...filters, isActive: e.target.value })}
+              className="input-field"
+            >
+              <option value="all">All Departments</option>
+              <option value="true">Active Only</option>
+              <option value="false">Inactive Only</option>
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={() => navigate('/departments/analytics')}
+              className="btn-outline flex items-center space-x-2"
+            >
+              <FaChartBar />
+              <span>View Analytics</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Departments Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {departments.map((dept) => (
+          <div key={dept._id} className="card hover:shadow-lg transition-shadow">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <FaBuilding className="text-primary-600 text-xl" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{dept.name}</h3>
+                  <p className="text-sm text-gray-500">Code: {dept.code}</p>
+                </div>
+              </div>
+              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                dept.isActive 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {dept.isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+
+            {/* Description */}
+            {dept.description && (
+              <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                {dept.description}
+              </p>
+            )}
+
+            {/* Location & Contact */}
+            <div className="space-y-2 mb-4">
+              {dept.location?.building && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <FaMapMarkerAlt className="mr-2 text-gray-400" />
+                  <span>
+                    {dept.location.building}, Floor {dept.location.floor}, {dept.location.office}
+                  </span>
+                </div>
+              )}
+              {dept.contactInfo?.email && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <FaEnvelope className="mr-2 text-gray-400" />
+                  <span>{dept.contactInfo.email}</span>
+                </div>
+              )}
+              {dept.contactInfo?.phone && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <FaPhone className="mr-2 text-gray-400" />
+                  <span>{dept.contactInfo.phone} {dept.contactInfo.extension && `ext. ${dept.contactInfo.extension}`}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Statistics */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="bg-gray-50 p-2 rounded text-center">
+                <p className="text-xs text-gray-500">Employees</p>
+                <p className="font-semibold">{dept.employeeCount || 0}</p>
+              </div>
+              <div className="bg-gray-50 p-2 rounded text-center">
+                <p className="text-xs text-gray-500">Managers</p>
+                <p className="font-semibold">
+                  {dept.employees?.filter(e => e.role === 'manager').length || 0}
+                </p>
+              </div>
+            </div>
+
+            {/* Leave Quota Preview */}
+            {dept.settings?.defaultLeaveQuota && (
+              <div className="text-xs text-gray-500 mb-4">
+                <span className="font-medium">Default Leave:</span>{' '}
+                A: {dept.settings.defaultLeaveQuota.annual} | 
+                S: {dept.settings.defaultLeaveQuota.sick} | 
+                P: {dept.settings.defaultLeaveQuota.personal}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <Link
+                to={`/departments/${dept._id}`}
+                className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center"
+              >
+                View Details
+                <FaChevronRight className="ml-1 text-xs" />
+              </Link>
+              
+              {isAdmin && (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => openEditModal(dept)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                    title="Edit"
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(dept._id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded"
+                    title="Delete"
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex justify-center space-x-2">
+          <button
+            onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
+            disabled={pagination.page === 1}
+            className="px-4 py-2 border rounded-lg disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="px-4 py-2">
+            Page {pagination.page} of {pagination.pages}
+          </span>
+          <button
+            onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
+            disabled={pagination.page === pagination.pages}
+            className="px-4 py-2 border rounded-lg disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      {/* Add/Edit Department Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">
+                {editingDept ? 'Edit Department' : 'Add New Department'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Basic Information */}
+              <div>
+                <h4 className="font-medium mb-3">Basic Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Department Name *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Department Code *</label>
+                    <input
+                      type="text"
+                      name="code"
+                      value={formData.code}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      required
+                      maxLength="10"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      rows="3"
+                      className="input-field"
+                      placeholder="Brief description of department..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <h4 className="font-medium mb-3">Location</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="form-label">Building</label>
+                    <input
+                      type="text"
+                      name="location.building"
+                      value={formData.location.building}
+                      onChange={handleInputChange}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Floor</label>
+                    <input
+                      type="text"
+                      name="location.floor"
+                      value={formData.location.floor}
+                      onChange={handleInputChange}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Office</label>
+                    <input
+                      type="text"
+                      name="location.office"
+                      value={formData.location.office}
+                      onChange={handleInputChange}
+                      className="input-field"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h4 className="font-medium mb-3">Contact Information</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="form-label">Email</label>
+                    <input
+                      type="email"
+                      name="contactInfo.email"
+                      value={formData.contactInfo.email}
+                      onChange={handleInputChange}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Phone</label>
+                    <input
+                      type="text"
+                      name="contactInfo.phone"
+                      value={formData.contactInfo.phone}
+                      onChange={handleInputChange}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Extension</label>
+                    <input
+                      type="text"
+                      name="contactInfo.extension"
+                      value={formData.contactInfo.extension}
+                      onChange={handleInputChange}
+                      className="input-field"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Leave Settings */}
+              <div>
+                <h4 className="font-medium mb-3">Default Leave Quota</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="form-label">Annual Leave</label>
+                    <input
+                      type="number"
+                      name="settings.defaultLeaveQuota.annual"
+                      value={formData.settings.defaultLeaveQuota.annual}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Sick Leave</label>
+                    <input
+                      type="number"
+                      name="settings.defaultLeaveQuota.sick"
+                      value={formData.settings.defaultLeaveQuota.sick}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Personal Leave</label>
+                    <input
+                      type="number"
+                      name="settings.defaultLeaveQuota.personal"
+                      value={formData.settings.defaultLeaveQuota.personal}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                >
+                  {editingDept ? 'Update Department' : 'Create Department'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Departments;
