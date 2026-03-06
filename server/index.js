@@ -7,15 +7,20 @@ const { WebSocketServer } = require("ws");
 const swaggerUi = require("swagger-ui-express");
 const swaggerDocument = require("./docs/swagger");
 dotenv.config();
-const { FRONTEND_URL, API_BASE_URL } = require("./config/appConfig");
+const { FRONTEND_URL, API_BASE_URL, CORS_ORIGINS } = require("./config/appConfig");
 
 const app = express();
 
 // Middleware
 app.use(
   cors({
-    // Allow all origins
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow server-to-server requests and CLI tooling with no Origin header
+      if (!origin) return callback(null, true);
+      if (!CORS_ORIGINS.length) return callback(null, true);
+      if (CORS_ORIGINS.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS origin not allowed"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],

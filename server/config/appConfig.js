@@ -10,6 +10,13 @@ const parseTime = (value, fallback) => {
 
 const SHIFT_START = parseTime(process.env.SHIFT_START_TIME, "09:00");
 const SHIFT_END = parseTime(process.env.SHIFT_END_TIME, "18:00");
+const COOKIE_SECURE = String(process.env.COOKIE_SECURE || "false").toLowerCase() === "true";
+const rawCookieSameSite = String(process.env.COOKIE_SAME_SITE || "").trim().toLowerCase();
+const COOKIE_SAME_SITE = ["lax", "strict", "none"].includes(rawCookieSameSite)
+  ? rawCookieSameSite
+  : COOKIE_SECURE
+    ? "none"
+    : "lax";
 const CORS_ORIGINS = String(process.env.CORS_ORIGINS || "")
   .split(",")
   .map((value) => value.trim())
@@ -24,7 +31,8 @@ module.exports = {
   ACCESS_TOKEN_EXPIRES_IN: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
   REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN || "30d",
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || "",
-  COOKIE_SECURE: String(process.env.COOKIE_SECURE || "false").toLowerCase() === "true",
+  COOKIE_SECURE,
+  COOKIE_SAME_SITE,
   SHIFT_START_TIME: SHIFT_START,
   SHIFT_END_TIME: SHIFT_END,
   CHECKIN_REMINDER_AFTER_MINUTES: Number(process.env.CHECKIN_REMINDER_AFTER_MINUTES || 10),

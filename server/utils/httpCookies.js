@@ -1,6 +1,7 @@
 const {
   COOKIE_DOMAIN,
   COOKIE_SECURE,
+  COOKIE_SAME_SITE,
 } = require("../config/appConfig");
 
 const parseCookies = (cookieHeader = "") => {
@@ -16,7 +17,7 @@ const parseCookies = (cookieHeader = "") => {
 const buildCookieOptions = (maxAgeMs) => ({
   httpOnly: true,
   secure: COOKIE_SECURE,
-  sameSite: "lax",
+  sameSite: COOKIE_SAME_SITE,
   path: "/",
   ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
   maxAge: maxAgeMs,
@@ -31,7 +32,7 @@ const clearAuthCookies = (res) => {
   const clearOptions = {
     httpOnly: true,
     secure: COOKIE_SECURE,
-    sameSite: "lax",
+    sameSite: COOKIE_SAME_SITE,
     path: "/",
     ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
   };
