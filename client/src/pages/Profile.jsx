@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Button, Input } from "@/components/ui";
 import { useAuth } from '../context/AuthContext';
 import {
   FaUserCircle,
@@ -17,19 +18,20 @@ import {
   FaEye,
   FaEyeSlash,
   FaHistory,
-  FaFileAlt,
   FaCheckCircle,
   FaTimesCircle,
   FaClock
 } from 'react-icons/fa';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import instance from '../services/axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import { authService, leaveService, supportService, userService } from "@/services/api";
+import { contactAdminSchema, mapZodErrors } from "@/lib/validation";
+import { getErrorMessage } from "@/lib/error";
+import PageErrorState from "@/components/PageErrorState";
 
 const Profile = () => {
-  const { user,  } = useAuth();
+  const { user, updateTwoFactor } = useAuth();
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -59,6 +61,7 @@ const Profile = () => {
     new: false,
     confirm: false
   });
+  useBodyScrollLock(showPasswordModal);
   const [recentActivities, setRecentActivities] = useState([]);
   const [stats, setStats] = useState({
     totalLeaves: 0,
@@ -66,19 +69,32 @@ const Profile = () => {
     approvedLeaves: 0,
     rejectedLeaves: 0
   });
+  const [loginHistory, setLoginHistory] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [pageError, setPageError] = useState("");
+  const [contactErrors, setContactErrors] = useState({});
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    subject: "",
+    message: "",
+    priority: "normal",
+  });
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorSaving, setTwoFactorSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchProfileDetails();
       fetchRecentActivities();
       fetchLeaveStats();
+      fetchLoginHistory();
     }
   }, [user]);
 
   const fetchProfileDetails = async () => {
     try {
-      const response = await instance.get('/users/profile');
-      const userData = response.data;
+      setPageError("");
+      const userData = await userService.getProfile();
       setProfileData({
         name: userData.name || '',
         email: userData.email || '',
@@ -95,16 +111,33 @@ const Profile = () => {
           personal: 0
         }
       });
+      setTwoFactorEnabled(!!userData.twoFactorEnabled);
     } catch (error) {
       console.error('Error fetching profile:', error);
-      toast.error('Failed to load profile');
+      const message = getErrorMessage(error, "Failed to load profile");
+      setPageError(message);
+      toast.error(message);
+    }
+  };
+
+  const handleToggleTwoFactor = async () => {
+    setTwoFactorSaving(true);
+    try {
+      const next = !twoFactorEnabled;
+      await updateTwoFactor(next);
+      setTwoFactorEnabled(next);
+      toast.success(`Two-factor authentication ${next ? "enabled" : "disabled"}`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update two-factor setting");
+    } finally {
+      setTwoFactorSaving(false);
     }
   };
 
   const fetchRecentActivities = async () => {
     try {
-      const response = await instance.get('/leaves/my-leaves?limit=5');
-      setRecentActivities(response.data || []);
+      const response = await leaveService.getMyLeaves({ limit: 5 });
+      setRecentActivities(response || []);
     } catch (error) {
       console.error('Error fetching activities:', error);
     }
@@ -112,8 +145,7 @@ const Profile = () => {
 
   const fetchLeaveStats = async () => {
     try {
-      const response = await instance.get('/leaves/summary');
-      const data = response.data;
+      const data = await leaveService.getSummary();
       setStats({
         totalLeaves: (data.used?.annual || 0) + (data.used?.sick || 0) + (data.used?.personal || 0),
         pendingLeaves: 0, // You'll need to calculate this from leaves
@@ -122,6 +154,48 @@ const Profile = () => {
       });
     } catch (error) {
       console.error('Error fetching leave stats:', error);
+    }
+  };
+
+  const fetchLoginHistory = async () => {
+    try {
+      const response = await authService.getLoginHistory();
+      setActiveSessionId(response.activeSessionId || null);
+      setLoginHistory(response.records || []);
+    } catch (error) {
+      console.error("Error fetching login history:", error);
+      toast.error(getErrorMessage(error, "Failed to load login history"));
+    }
+  };
+
+  const handleLogoutDevice = async (sessionId) => {
+    try {
+      await authService.logoutDeviceSession(sessionId);
+      toast.success("Device session logged out");
+      await fetchLoginHistory();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to logout device"));
+    }
+  };
+
+  const handleContactAdminSubmit = async (e) => {
+    e.preventDefault();
+    const parsed = contactAdminSchema.safeParse(contactForm);
+    if (!parsed.success) {
+      setContactErrors(mapZodErrors(parsed.error));
+      return;
+    }
+
+    setContactErrors({});
+    setContactLoading(true);
+    try {
+      await supportService.contactAdministrator(parsed.data);
+      toast.success("Administrator notified");
+      setContactForm({ subject: "", message: "", priority: "normal" });
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to contact administrator"));
+    } finally {
+      setContactLoading(false);
     }
   };
 
@@ -143,7 +217,7 @@ const Profile = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await instance.put('/users/profile', {
+      await userService.updateProfile({
         name: profileData.name,
         email: profileData.email,
         phone: profileData.phone,
@@ -172,7 +246,7 @@ const Profile = () => {
 
     setLoading(true);
     try {
-      await instance.put('/users/change-password', {
+      await userService.changePassword({
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
       });
@@ -198,13 +272,11 @@ const Profile = () => {
     formData.append('profilePicture', file);
 
     try {
-      await instance.post('/users/profile/picture', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await userService.uploadProfilePicture(formData);
       toast.success('Profile picture updated');
       fetchProfileDetails();
     } catch (error) {
-      toast.error(error, 'Failed to upload picture');
+      toast.error(getErrorMessage(error, "Failed to upload picture"));
     }
   };
 
@@ -227,6 +299,14 @@ const Profile = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {pageError ? (
+        <PageErrorState
+          title="Profile load failed"
+          message={pageError}
+          onRetry={fetchProfileDetails}
+        />
+      ) : null}
+
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg p-8 text-white relative">
         <div className="flex items-start justify-between">
@@ -241,7 +321,7 @@ const Profile = () => {
                 className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-100"
               >
                 <FaCamera className="text-primary-600 text-sm" />
-                <input
+                <Input
                   type="file"
                   id="profile-picture"
                   className="hidden"
@@ -272,29 +352,29 @@ const Profile = () => {
           {/* Action Buttons */}
           <div className="flex space-x-2">
             {!editMode ? (
-              <button
+              <Button
                 onClick={() => setEditMode(true)}
                 className="bg-white text-primary-600 px-4 py-2 rounded-lg hover:bg-gray-100 flex items-center space-x-2"
               >
                 <FaEdit />
                 <span>Edit Profile</span>
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 onClick={() => setEditMode(false)}
                 className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center space-x-2"
               >
                 <FaTimes />
                 <span>Cancel</span>
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={() => setShowPasswordModal(true)}
               className="bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30 flex items-center space-x-2"
             >
               <FaLock />
               <span>Change Password</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -361,8 +441,8 @@ const Profile = () => {
               <form onSubmit={handleProfileUpdate} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="form-label">Full Name</label>
-                    <input
+                    <label className="form-label required-label">Full Name</label>
+                    <Input
                       type="text"
                       name="name"
                       value={profileData.name}
@@ -372,8 +452,8 @@ const Profile = () => {
                     />
                   </div>
                   <div>
-                    <label className="form-label">Email</label>
-                    <input
+                    <label className="form-label required-label">Email</label>
+                    <Input
                       type="email"
                       name="email"
                       value={profileData.email}
@@ -384,7 +464,7 @@ const Profile = () => {
                   </div>
                   <div>
                     <label className="form-label">Phone</label>
-                    <input
+                    <Input
                       type="tel"
                       name="phone"
                       value={profileData.phone}
@@ -395,7 +475,7 @@ const Profile = () => {
                   </div>
                   <div>
                     <label className="form-label">Address</label>
-                    <input
+                    <Input
                       type="text"
                       name="address"
                       value={profileData.address}
@@ -418,21 +498,21 @@ const Profile = () => {
                 </div>
 
                 <div className="flex justify-end space-x-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setEditMode(false)}
                     className="btn-secondary"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={loading}
                     className="btn-primary flex items-center space-x-2"
                   >
                     <FaSave />
                     <span>{loading ? 'Saving...' : 'Save Changes'}</span>
-                  </button>
+                  </Button>
                 </div>
               </form>
             ) : (
@@ -535,6 +615,53 @@ const Profile = () => {
               )}
             </div>
           </div>
+
+          {/* Login History & Device Management */}
+          <div className="card mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center">
+                <FaHistory className="mr-2 text-primary-600" />
+                Login History & Devices
+              </h2>
+              <Button onClick={fetchLoginHistory} className="btn-secondary text-sm">
+                Refresh
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {loginHistory.length > 0 ? (
+                loginHistory.map((session) => {
+                  const isCurrent = session.sessionId === activeSessionId;
+                  const canLogout = session.isActive && !isCurrent;
+                  return (
+                    <div key={session._id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium">{session.deviceName || "Unknown Device"}</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-1 rounded-full ${isCurrent ? "bg-green-100 text-green-700" : session.isActive ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                            {isCurrent ? "Current" : session.isActive ? "Active" : "Logged out"}
+                          </span>
+                          {canLogout ? (
+                            <Button
+                              className="text-xs px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200"
+                              onClick={() => handleLogoutDevice(session.sessionId)}
+                            >
+                              Logout Device
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">IP: {session.ipAddress || "N/A"}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Login: {session.loginAt ? format(new Date(session.loginAt), "MMM dd, yyyy HH:mm") : "N/A"}
+                      </p>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-center text-gray-500 py-4">No login history found</p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Sidebar - Leave Balance & Quick Actions */}
@@ -580,28 +707,80 @@ const Profile = () => {
           <div className="card">
             <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
             <div className="space-y-2">
-              <button
+              <Button
                 onClick={() => window.location.href = '/apply-leave'}
                 className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg flex items-center space-x-3"
               >
                 <FaCalendarAlt className="text-primary-600" />
                 <span>Apply for Leave</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => window.location.href = '/leave-history'}
                 className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg flex items-center space-x-3"
               >
                 <FaHistory className="text-primary-600" />
                 <span>View Leave History</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => window.location.href = '/attendance'}
                 className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg flex items-center space-x-3"
               >
                 <FaClock className="text-primary-600" />
                 <span>Attendance</span>
-              </button>
+              </Button>
             </div>
+          </div>
+
+          {/* Contact Administrator */}
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">Contact Administrator</h2>
+            <form className="space-y-3" onSubmit={handleContactAdminSubmit}>
+              <div>
+                <label className="required-label block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <Input
+                  value={contactForm.subject}
+                  onChange={(e) => setContactForm((prev) => ({ ...prev, subject: e.target.value }))}
+                  placeholder="Login issue on device"
+                  required
+                />
+                {contactErrors.subject ? (
+                  <p className="text-xs text-red-600 mt-1">{contactErrors.subject}</p>
+                ) : null}
+              </div>
+              <div>
+                <label className="required-label block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  value={contactForm.priority}
+                  onChange={(e) => setContactForm((prev) => ({ ...prev, priority: e.target.value }))}
+                  className="input-field rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 w-full"
+                  required
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                </select>
+                {contactErrors.priority ? (
+                  <p className="text-xs text-red-600 mt-1">{contactErrors.priority}</p>
+                ) : null}
+              </div>
+              <div>
+                <label className="required-label block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea
+                  value={contactForm.message}
+                  onChange={(e) => setContactForm((prev) => ({ ...prev, message: e.target.value }))}
+                  className="input-field rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 w-full"
+                  placeholder="Describe your issue in detail"
+                  rows={4}
+                  required
+                />
+                {contactErrors.message ? (
+                  <p className="text-xs text-red-600 mt-1">{contactErrors.message}</p>
+                ) : null}
+              </div>
+              <Button type="submit" disabled={contactLoading} className="btn-primary w-full">
+                {contactLoading ? "Sending..." : "Send to Admin"}
+              </Button>
+            </form>
           </div>
 
           {/* Account Info */}
@@ -624,6 +803,23 @@ const Profile = () => {
                 <span className="text-gray-600">Account status:</span>
                 <span className="text-green-600 font-medium">Active</span>
               </div>
+              <div className="pt-2 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Two-factor authentication:</span>
+                  <Button
+                    type="button"
+                    onClick={handleToggleTwoFactor}
+                    disabled={twoFactorSaving}
+                    className={twoFactorEnabled ? "btn-secondary" : "btn-primary"}
+                  >
+                    {twoFactorSaving
+                      ? "Saving..."
+                      : twoFactorEnabled
+                        ? "Disable 2FA"
+                        : "Enable 2FA"}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -631,26 +827,31 @@ const Profile = () => {
 
       {/* Change Password Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+        <div
+          className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowPasswordModal(false);
+          }}
+        >
+          <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold flex items-center">
                 <FaLock className="mr-2 text-primary-600" />
                 Change Password
               </h3>
-              <button
+              <Button
                 onClick={() => setShowPasswordModal(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <FaTimes />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <label className="form-label">Current Password</label>
+                <label className="form-label required-label">Current Password</label>
                 <div className="relative">
-                  <input
+                  <Input
                     type={showPassword.current ? 'text' : 'password'}
                     name="currentPassword"
                     value={passwordData.currentPassword}
@@ -658,20 +859,20 @@ const Profile = () => {
                     className="input-field pr-10"
                     required
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => togglePasswordVisibility('current')}
                     className="absolute right-3 top-3 text-gray-400"
                   >
                     {showPassword.current ? <FaEyeSlash /> : <FaEye />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               <div>
-                <label className="form-label">New Password</label>
+                <label className="form-label required-label">New Password</label>
                 <div className="relative">
-                  <input
+                  <Input
                     type={showPassword.new ? 'text' : 'password'}
                     name="newPassword"
                     value={passwordData.newPassword}
@@ -680,20 +881,20 @@ const Profile = () => {
                     required
                     minLength="6"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => togglePasswordVisibility('new')}
                     className="absolute right-3 top-3 text-gray-400"
                   >
                     {showPassword.new ? <FaEyeSlash /> : <FaEye />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               <div>
-                <label className="form-label">Confirm New Password</label>
+                <label className="form-label required-label">Confirm New Password</label>
                 <div className="relative">
-                  <input
+                  <Input
                     type={showPassword.confirm ? 'text' : 'password'}
                     name="confirmPassword"
                     value={passwordData.confirmPassword}
@@ -701,31 +902,31 @@ const Profile = () => {
                     className="input-field pr-10"
                     required
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => togglePasswordVisibility('confirm')}
                     className="absolute right-3 top-3 text-gray-400"
                   >
                     {showPassword.confirm ? <FaEyeSlash /> : <FaEye />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
-                <button
+                <Button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
                   className="btn-secondary"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={loading}
                   className="btn-primary"
                 >
                   {loading ? 'Changing...' : 'Change Password'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

@@ -35,7 +35,7 @@ const announcementSchema = new mongoose.Schema({
   },
   createdByRole: {
     type: String,
-    enum: ['admin', 'manager', 'employee'],
+    enum: ['super_admin', 'admin', 'manager', 'employee'],
     required: true
   },
   attachments: [{
@@ -115,20 +115,28 @@ announcementSchema.virtual('isExpired').get(function() {
 
 // Method to check if user can view this announcement
 announcementSchema.methods.canUserView = function(user) {
-  // Admin can view everything
-  if (user.role === 'admin') return true;
+  // Super admin can view everything
+  if (user.role === 'super_admin') return true;
+
+  const isScopedRole = ['admin', 'manager'].includes(user.role);
+  const hasDepartmentTargets = Array.isArray(this.targetDepartments) && this.targetDepartments.length > 0;
+  const inTargetDepartment = this.targetDepartments.includes(user.department);
   
   // If targetRoles includes 'all', everyone can view
-  if (this.targetRoles.includes('all')) return true;
+  if (this.targetRoles.includes('all')) {
+    if (!isScopedRole || !hasDepartmentTargets || inTargetDepartment) return true;
+  }
   
   // Check if user's role is in targetRoles
-  if (this.targetRoles.includes(user.role)) return true;
+  if (this.targetRoles.includes(user.role)) {
+    if (!isScopedRole || !hasDepartmentTargets || inTargetDepartment) return true;
+  }
   
   // Check if user's department is in targetDepartments
-  if (this.targetDepartments.includes(user.department)) return true;
+  if (inTargetDepartment) return true;
   
   // If created by manager and user is in same department
-  if (this.createdByRole === 'manager' && this.targetDepartments.includes(user.department)) {
+  if (this.createdByRole === 'manager' && inTargetDepartment) {
     return true;
   }
   

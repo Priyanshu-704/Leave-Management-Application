@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import { announcementService } from "@/services/api";
 import {
   FaBullhorn,
   FaExclamationTriangle,
@@ -12,8 +12,6 @@ import {
   FaBuilding,
 } from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const DashboardAnnouncementCard = () => {
   const { user } = useAuth();
@@ -27,9 +25,9 @@ const DashboardAnnouncementCard = () => {
 
   const fetchRecentAnnouncements = async () => {
     try {
-      const response = await axios.get(`${API_URL}/announcements?limit=3`);
-      setAnnouncements(response.data.data || []);
-      setUnreadCount(response.data.unreadCount || 0);
+      const response = await announcementService.getAnnouncements({ limit: 3 });
+      setAnnouncements(response.data || []);
+      setUnreadCount(response.unreadCount || 0);
     } catch (error) {
       console.error("Error fetching announcements:", error);
     } finally {
@@ -54,24 +52,24 @@ const DashboardAnnouncementCard = () => {
     return (
       <div className="card bg-gradient-to-br from-purple-50 to-white">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800 flex items-center">
+          <h3 className="flex items-center font-semibold text-gray-800">
             <FaBullhorn className="mr-2 text-purple-600" />
             Announcements
           </h3>
         </div>
         <div className="space-y-2">
-          <div className="h-10 bg-gray-200 animate-pulse rounded"></div>
-          <div className="h-10 bg-gray-200 animate-pulse rounded"></div>
+          <div className="h-10 rounded bg-gray-200 animate-pulse"></div>
+          <div className="h-10 rounded bg-gray-200 animate-pulse"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="card bg-gradient-to-br from-purple-50 to-white hover:shadow-md transition-shadow">
+    <div className="card bg-gradient-to-br from-purple-50 to-white transition-shadow hover:shadow-md">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-800 flex items-center">
+        <h3 className="flex items-center font-semibold text-gray-800">
           <FaBullhorn className="mr-2 text-purple-600" />
           Announcements
           {unreadCount > 0 && (
@@ -82,7 +80,7 @@ const DashboardAnnouncementCard = () => {
         </h3>
         <Link
           to="/announcements"
-          className="text-sm text-purple-600 hover:text-purple-800 flex items-center"
+          className="flex items-center text-sm text-purple-600 hover:text-purple-800"
         >
           View all
           <FaChevronRight className="ml-1 text-xs" />
@@ -96,7 +94,7 @@ const DashboardAnnouncementCard = () => {
             <Link
               key={announcement._id}
               to={`/announcements`}
-              className="block p-2 hover:bg-white rounded-lg transition-colors"
+              className="block rounded-lg p-2 transition-colors hover:bg-white"
             >
               <div className="flex items-start space-x-2">
                 {/* Icon based on type/priority */}
@@ -115,7 +113,7 @@ const DashboardAnnouncementCard = () => {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="truncate text-sm font-medium text-gray-900">
                       {announcement.title}
                     </p>
                     {!announcement.readBy?.some(
@@ -125,7 +123,7 @@ const DashboardAnnouncementCard = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center space-x-2 text-xs text-gray-500 mt-0.5">
+                  <div className="mt-0.5 flex items-center space-x-2 text-xs text-gray-500">
                     <span className="flex items-center">
                       <FaUserCircle className="mr-1" />
                       {announcement.createdBy?.name?.split(" ")[0]}
@@ -152,7 +150,7 @@ const DashboardAnnouncementCard = () => {
                   </div>
 
                   {/* Preview of content - first line only */}
-                  <p className="text-xs text-gray-600 mt-1 line-clamp-1">
+                  <p className="mt-1 line-clamp-1 text-xs text-gray-600">
                     {announcement.content.substring(0, 60)}
                     {announcement.content.length > 60 && "..."}
                   </p>
@@ -169,7 +167,7 @@ const DashboardAnnouncementCard = () => {
           ))
         ) : (
           <div className="text-center py-4">
-            <FaBullhorn className="mx-auto text-gray-300 text-2xl mb-2" />
+            <FaBullhorn className="mx-auto mb-2 text-2xl text-gray-300" />
             <p className="text-sm text-gray-500">No announcements yet</p>
           </div>
         )}
@@ -178,7 +176,7 @@ const DashboardAnnouncementCard = () => {
         {announcements.length > 2 && (
           <Link
             to="/announcements"
-            className="block text-center text-xs text-purple-600 hover:text-purple-800 mt-2 pt-2 border-t border-purple-100"
+            className="mt-2 block border-t border-purple-100 pt-2 text-center text-xs text-purple-600 hover:text-purple-800"
           >
             + {announcements.length - 2} more announcements
           </Link>

@@ -8,6 +8,7 @@
     "dev": "nodemon index.js",
     "seed:departments": "node scripts/seedDepartments.js",
     "create-admin": "node scripts/createAdmin.js",
+    "create-super-admin": "node scripts/createSuperAdmin.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -19,9 +20,13 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-validator": "^7.3.1",
+    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.1",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "nodemailer": "^6.10.1",
+    "swagger-ui-express": "^5.0.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

@@ -8,11 +8,9 @@ import {
   useRef,
   useCallback,
 } from "react";
-import axios from "axios";
 import toast from "react-hot-toast";
 import { useAuth } from "./AuthContext";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import { attendanceService } from "@/services/api";
 
 const AttendanceContext = createContext();
 
@@ -30,6 +28,23 @@ export const AttendanceProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
+
+  const saveSessionToLocalStorage = useCallback(
+    (attendance) => {
+      if (!user) return;
+
+      const sessionData = {
+        date: new Date().toDateString(),
+        isCheckedIn: !!attendance?.checkIn?.time,
+        isCheckedOut: !!attendance?.checkOut?.time,
+        startTime: attendance?.checkIn?.time,
+        attendanceId: attendance?._id,
+      };
+
+      localStorage.setItem(`attendance_${user._id}`, JSON.stringify(sessionData));
+    },
+    [user],
+  );
 
   // Refs to track if data has been fetched
   const hasFetchedToday = useRef(false);
@@ -65,8 +80,8 @@ export const AttendanceProvider = ({ children }) => {
 
       try {
         console.log("Fetching today attendance...");
-        const response = await axios.get(`${API_URL}/attendance/today`);
-        const attendance = response.data.data;
+        const response = await attendanceService.getToday();
+        const attendance = response.data;
         setTodayAttendance(attendance);
 
         if (attendance) {
@@ -85,9 +100,8 @@ export const AttendanceProvider = ({ children }) => {
       } finally {
         fetchInProgress.current = false;
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [isAuthenticated, user],
+    [isAuthenticated, user, saveSessionToLocalStorage],
   );
 
   // Load session from localStorage on mount - only once
@@ -135,20 +149,6 @@ export const AttendanceProvider = ({ children }) => {
     fetchInProgress.current = false;
   }, [user?._id]);
 
-  const saveSessionToLocalStorage = (attendance) => {
-    if (!user) return;
-
-    const sessionData = {
-      date: new Date().toDateString(),
-      isCheckedIn: !!attendance?.checkIn?.time,
-      isCheckedOut: !!attendance?.checkOut?.time,
-      startTime: attendance?.checkIn?.time,
-      attendanceId: attendance?._id,
-    };
-
-    localStorage.setItem(`attendance_${user._id}`, JSON.stringify(sessionData));
-  };
-
   const checkIn = async (data = {}) => {
     setLoading(true);
     try {
@@ -179,22 +179,19 @@ export const AttendanceProvider = ({ children }) => {
         }
       }
 
-      const response = await axios.post(
-        `${API_URL}/attendance/checkin`,
-        requestData,
-      );
-      setTodayAttendance(response.data.data);
-      saveSessionToLocalStorage(response.data.data);
+      const response = await attendanceService.checkIn(requestData);
+      setTodayAttendance(response.data);
+      saveSessionToLocalStorage(response.data);
 
-      if (response.data.data.checkIn?.time) {
-        setSessionStartTime(response.data.data.checkIn.time);
+      if (response.data.checkIn?.time) {
+        setSessionStartTime(response.data.checkIn.time);
       }
 
       // Reset fetch flag so next fetch will get fresh data
       hasFetchedToday.current = true;
 
       toast.success("Check-in successful!");
-      return response.data;
+      return response;
     } catch (error) {
       const message = error.response?.data?.message || "Check-in failed";
       toast.error(message);
@@ -234,16 +231,13 @@ export const AttendanceProvider = ({ children }) => {
         }
       }
 
-      const response = await axios.put(
-        `${API_URL}/attendance/checkout`,
-        requestData,
-      );
-      setTodayAttendance(response.data.data);
-      saveSessionToLocalStorage(response.data.data);
+      const response = await attendanceService.checkOut(requestData);
+      setTodayAttendance(response.data);
+      saveSessionToLocalStorage(response.data);
       setSessionStartTime(null);
 
       toast.success("Check-out successful!");
-      return response.data;
+      return response;
     } catch (error) {
       const message = error.response?.data?.message || "Check-out failed";
       toast.error(message);
@@ -255,13 +249,11 @@ export const AttendanceProvider = ({ children }) => {
 
   const startBreak = async (type = "other") => {
     try {
-      const response = await axios.post(`${API_URL}/attendance/break`, {
-        type,
-      });
-      setTodayAttendance(response.data.data);
-      saveSessionToLocalStorage(response.data.data);
+      const response = await attendanceService.startBreak(type);
+      setTodayAttendance(response.data);
+      saveSessionToLocalStorage(response.data);
       toast.success("Break started");
-      return response.data;
+      return response;
     } catch (error) {
       const message = error.response?.data?.message || "Failed to start break";
       toast.error(message);
@@ -271,11 +263,11 @@ export const AttendanceProvider = ({ children }) => {
 
   const endBreak = async () => {
     try {
-      const response = await axios.put(`${API_URL}/attendance/break/end`);
-      setTodayAttendance(response.data.data);
-      saveSessionToLocalStorage(response.data.data);
+      const response = await attendanceService.endBreak();
+      setTodayAttendance(response.data);
+      saveSessionToLocalStorage(response.data);
       toast.success("Break ended");
-      return response.data;
+      return response;
     } catch (error) {
       const message = error.response?.data?.message || "Failed to end break";
       toast.error(message);

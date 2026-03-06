@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react';
+import { Button, Input } from "@/components/ui";
+import PageSkeleton from "@/components/PageSkeleton";
 import { format } from 'date-fns';
 import {
   FaCalendarAlt,
@@ -14,8 +15,8 @@ import {
   FaExclamationTriangle
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { attendanceService } from "@/services/api";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 const AttendanceHistory = () => {
   const [attendance, setAttendance] = useState([]);
@@ -31,12 +32,9 @@ const AttendanceHistory = () => {
     pages: 1,
     total: 0
   });
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
 
-  useEffect(() => {
-    fetchAttendance();
-  }, [filters.startDate, filters.endDate, pagination.page]);
-
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -46,17 +44,23 @@ const AttendanceHistory = () => {
         limit: 20
       });
 
-      const response = await axios.get(`${API_URL}/attendance/history?${params}`);
-      setAttendance(response.data.data);
-      setSummary(response.data.summary);
-      setPagination(response.data.pagination);
+      const response = await attendanceService.getHistory(
+        Object.fromEntries(params.entries()),
+      );
+      setAttendance(response.data);
+      setSummary(response.summary);
+      setPagination(response.pagination);
     } catch (error) {
       console.error('Error fetching attendance:', error);
       toast.error('Failed to fetch attendance history');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.startDate, filters.endDate, pagination.page]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
 
   const getStatusIcon = (status, isLate) => {
     if (isLate) return <FaExclamationTriangle className="text-yellow-500" />;
@@ -78,12 +82,16 @@ const AttendanceHistory = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+  const filteredAttendance = attendance.filter((record) => {
+    if (!debouncedSearch) return true;
+    const searchLower = debouncedSearch.toLowerCase();
+    const dateStr = format(new Date(record.date), "MMM dd, yyyy").toLowerCase();
+    const status = String(record.status || "").toLowerCase();
+    return dateStr.includes(searchLower) || status.includes(searchLower);
+  });
+
+  if (loading && attendance.length === 0 && !filters.search.trim()) {
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -92,20 +100,20 @@ const AttendanceHistory = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Attendance History</h1>
         <div className="flex space-x-3">
-          <button
+          <Button
             onClick={() => {/* Export PDF */}}
             className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             <FaFilePdf />
             <span>PDF</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {/* Export Excel */}}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             <FaFileExcel />
             <span>Excel</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -147,7 +155,7 @@ const AttendanceHistory = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="form-label">From Date</label>
-            <input
+            <Input
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
@@ -156,7 +164,7 @@ const AttendanceHistory = () => {
           </div>
           <div>
             <label className="form-label">To Date</label>
-            <input
+            <Input
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
@@ -166,7 +174,7 @@ const AttendanceHistory = () => {
           <div>
             <label className="form-label">Search</label>
             <div className="relative">
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -195,7 +203,7 @@ const AttendanceHistory = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {attendance.map((record) => (
+              {filteredAttendance.map((record) => (
                 <tr key={record._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     {format(new Date(record.date), 'MMM dd, yyyy')}
@@ -233,12 +241,12 @@ const AttendanceHistory = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <button
+                    <Button
                       onClick={() => {/* View details */}}
                       className="text-primary-600 hover:text-primary-800"
                     >
                       <FaEye />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -249,23 +257,23 @@ const AttendanceHistory = () => {
         {/* Pagination */}
         {pagination.pages > 1 && (
           <div className="flex justify-center mt-4 space-x-2">
-            <button
+            <Button
               onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
               disabled={pagination.page === 1}
               className="px-3 py-1 border rounded disabled:opacity-50"
             >
               Previous
-            </button>
+            </Button>
             <span className="px-3 py-1">
               Page {pagination.page} of {pagination.pages}
             </span>
-            <button
+            <Button
               onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
               disabled={pagination.page === pagination.pages}
               className="px-3 py-1 border rounded disabled:opacity-50"
             >
               Next
-            </button>
+            </Button>
           </div>
         )}
       </div>

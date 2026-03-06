@@ -1,10 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
-import instance from '../services/axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { authService } from "@/services/api";
 
 const AuthContext = createContext();
 
@@ -13,90 +10,83 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Configure axios defaults when token changes
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
-
-  // Fetch user on initial load if token exists
   useEffect(() => {
     const fetchUser = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
       try {
-        console.log('Fetching user with token:', token); // Debug log
-        const response = await instance.get(`${API_URL}/auth/me`);
-        console.log('User fetched:', response.data); // Debug log
-        setUser(response.data);
+        const response = await authService.getMe();
+        setUser(response);
       } catch (error) {
         console.error('Error fetching user:', error.response || error);
-        
-        // If token is invalid, clear it
-        if (error.response?.status === 401 || error.response?.status === 500) {
-          console.log('Token invalid, clearing...');
-          localStorage.removeItem('token');
-          setToken(null);
-          delete axios.defaults.headers.common['Authorization'];
-        }
-        
-        // Show error message
+
         if (error.response?.status === 500) {
           toast.error('Server error. Please try again later.');
         }
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchUser();
-  }, [token]);
+  }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, options = {}) => {
     try {
-      console.log('Attempting login with:', { email }); // Debug log
-      
-      const response = await axios.post(`${API_URL}/auth/login`, { 
-        email, 
-        password 
+      const response = await authService.login({
+        email,
+        password,
+        takeoverExistingSession: Boolean(options.takeoverExistingSession),
+        twoFactorCode: options.twoFactorCode,
       });
-      
-      console.log('Login response:', response.data); // Debug log
-      
-      const { token, ...userData } = response.data;
-      
-      // Save token
-      localStorage.setItem('token', token);
-      setToken(token);
+      if (response?.requiresTwoFactor) {
+        return {
+          success: false,
+          requiresTwoFactor: true,
+          message: response.message,
+          deviceName: response.deviceName,
+          isNewDevice: response.isNewDevice,
+        };
+      }
+      const userData = response;
       setUser(userData);
       
-      // Set axios header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      toast.success('Login successful!');
-      return true;
+      if (userData.forcePasswordChange) {
+        toast.success('Login successful. Please change your password.');
+      } else {
+        toast.success('Login successful!');
+      }
+      return { success: true, forcePasswordChange: !!userData.forcePasswordChange };
     } catch (error) {
       console.error('Login error:', error.response || error);
+      if (error.response?.status === 409 && error.response?.data?.code === "ACTIVE_SESSION_EXISTS") {
+        return {
+          success: false,
+          forcePasswordChange: false,
+          requiresTakeover: true,
+          activeSession: error.response?.data?.activeSession || null,
+          message: error.response?.data?.message || "Active session exists",
+        };
+      }
       const message = error.response?.data?.message || 'Login failed';
       toast.error(message);
-      return false;
+      return { success: false, forcePasswordChange: false };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
+  const updateTwoFactor = async (enabled) => {
+    const response = await authService.updateTwoFactor(enabled);
+    setUser((prev) => (prev ? { ...prev, twoFactorEnabled: !!enabled } : prev));
+    return response;
+  };
+
+  const logout = async () => {
+    try {
+      await authService.logoutSession();
+    } catch (error) {
+      // Ignore network/logout race errors and clear local session anyway.
+    }
     setUser(null);
-    delete axios.defaults.headers.common['Authorization'];
     toast.success('Logged out successfully');
   };
 
@@ -106,8 +96,10 @@ export const AuthProvider = ({ children }) => {
     logout,
     loading,
     isAuthenticated: !!user,
-    isManager: user?.role === 'manager' || user?.role === 'admin',
-    isAdmin: user?.role === 'admin'
+    updateTwoFactor,
+    isSuperAdmin: user?.role === 'super_admin',
+    isManager: ['manager', 'admin', 'super_admin'].includes(user?.role),
+    isAdmin: ['admin', 'super_admin'].includes(user?.role)
   };
 
   return (

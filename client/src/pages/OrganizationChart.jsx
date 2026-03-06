@@ -1,7 +1,9 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
+import { Button, Input } from "@/components/ui";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import { departmentService, userService } from "@/services/api";
 import {
   FaBuilding,
   FaUsers,
@@ -16,8 +18,6 @@ import {
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const OrganizationChart = () => {
   const { isAdmin, isManager } = useAuth();
@@ -36,14 +36,15 @@ const OrganizationChart = () => {
     setLoading(true);
     try {
       // Fetch all departments with employees
-      const deptResponse = await axios.get(
-        `${API_URL}/departments?limit=100&includeStats=true`,
-      );
-      const depts = deptResponse.data.data || [];
+      const deptResponse = await departmentService.getDepartments({
+        limit: 100,
+        includeStats: true,
+      });
+      const depts = deptResponse.data || [];
 
       // Fetch users to get all employees
-      const usersResponse = await axios.get(`${API_URL}/users?limit=1000`);
-      const users = usersResponse.data.users || [];
+      const usersResponse = await userService.getUsers({ limit: 1000 });
+      const users = usersResponse.users || [];
 
       // Organize users by department
       const usersByDept = {};
@@ -107,11 +108,11 @@ const OrganizationChart = () => {
   const getRoleIcon = (role) => {
     switch (role) {
       case "admin":
-        return "👑";
+        return <FaUserTie className="text-purple-600" />;
       case "manager":
-        return "⭐";
+        return <FaUserTie className="text-blue-600" />;
       default:
-        return "👤";
+        return <FaUserCircle className="text-gray-500" />;
     }
   };
 
@@ -137,11 +138,7 @@ const OrganizationChart = () => {
   );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -157,20 +154,20 @@ const OrganizationChart = () => {
           </p>
         </div>
         <div className="flex space-x-2">
-          <button
+          <Button
             onClick={() => setViewMode("grid")}
             className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-primary-100 text-primary-600" : "bg-gray-100 text-gray-600"}`}
             title="Grid View"
           >
             <FaLayerGroup />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setViewMode("list")}
             className={`p-2 rounded-lg ${viewMode === "list" ? "bg-primary-100 text-primary-600" : "bg-gray-100 text-gray-600"}`}
             title="List View"
           >
             <FaChartPie />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -180,7 +177,7 @@ const OrganizationChart = () => {
           <div className="card">
             <div className="relative">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
+              <Input
                 type="text"
                 placeholder="Search departments or employees..."
                 value={searchTerm}

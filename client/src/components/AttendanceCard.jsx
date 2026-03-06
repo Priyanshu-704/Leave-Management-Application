@@ -13,6 +13,7 @@ import {
   FaPause,
 } from "react-icons/fa";
 import { format } from "date-fns";
+import { Button } from "@/components/ui";
 
 const AttendanceCard = () => {
   const {
@@ -159,7 +160,7 @@ const AttendanceCard = () => {
   if (isCheckedIn && !todayAttendance) {
     return (
       <div className="card bg-gradient-to-br from-primary-50 to-white">
-        <h2 className="text-lg font-semibold mb-4 flex items-center">
+        <h2 className="mb-4 flex items-center text-lg font-semibold text-gray-900">
           <FaClock className="mr-2 text-primary-600" />
           Today's Attendance
         </h2>
@@ -173,25 +174,25 @@ const AttendanceCard = () => {
 
   return (
     <div className="card bg-gradient-to-br from-primary-50 to-white">
-      <h2 className="text-lg font-semibold mb-4 flex items-center">
+      <h2 className="mb-4 flex items-center text-lg font-semibold text-gray-900">
         <FaClock className="mr-2 text-primary-600" />
         Today's Attendance
       </h2>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-white p-3 rounded-lg border">
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">Check In</p>
           <p className="text-lg font-semibold text-green-600">
             {formatTimeAMPM(todayAttendance?.checkIn?.time)}
           </p>
           {todayAttendance?.checkIn?.location && (
-            <p className="text-xs text-gray-400 mt-1 flex items-center">
+            <p className="mt-1 flex items-center text-xs text-gray-400">
               <FaMapMarkerAlt className="mr-1" /> Location recorded
             </p>
           )}
         </div>
 
-        <div className="bg-white p-3 rounded-lg border">
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">Check Out</p>
           <p className="text-lg font-semibold text-red-600">
             {formatTimeAMPM(todayAttendance?.checkOut?.time)}
@@ -203,44 +204,44 @@ const AttendanceCard = () => {
         <div className="space-y-3 mb-4">
           {/* Main Work Timer */}
           <div
-            className={`p-4 rounded-lg ${isOnBreak ? "bg-gray-100" : "bg-blue-50"}`}
+            className={`rounded-lg p-4 ${isOnBreak ? "bg-gray-100" : "bg-blue-50"}`}
           >
             <div className="flex items-center justify-between mb-1">
               <p
                 className={`text-sm font-medium ${isOnBreak ? "text-gray-600" : "text-blue-700"}`}
               >
                 {isOnBreak
-                  ? "⏸️ Work paused (on break)"
-                  : "⌛ Working duration"}
+                  ? "Work paused (on break)"
+                  : "Working duration"}
               </p>
               {isOnBreak && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
                   Break Active
                 </span>
               )}
             </div>
             <p
-              className={`text-3xl font-mono font-bold ${isOnBreak ? "text-gray-500" : "text-blue-800"}`}
+              className={`font-mono text-3xl font-bold ${isOnBreak ? "text-gray-500" : "text-blue-800"}`}
             >
               {formatTime(totalWorkTime)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="mt-1 text-xs text-gray-500">
               Total work time (excluding breaks)
             </p>
           </div>
 
           {/* Break Timer - Only shown when on break */}
           {isOnBreak && (
-            <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-yellow-700 flex items-center">
+                <p className="flex items-center text-sm font-medium text-yellow-700">
                   <FaCoffee className="mr-2" /> Break duration
                 </p>
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
                   On Break
                 </span>
               </div>
-              <p className="text-2xl font-mono font-bold text-yellow-600 mt-1">
+              <p className="mt-1 font-mono text-2xl font-bold text-yellow-600">
                 {getCurrentBreakDuration()}
               </p>
             </div>
@@ -248,7 +249,7 @@ const AttendanceCard = () => {
 
           {/* Break Summary */}
           {totalBreakTime > 0 && (
-            <div className="text-xs text-gray-500 flex justify-between">
+            <div className="flex justify-between text-xs text-gray-500">
               <span>Total break time today:</span>
               <span className="font-medium">{formatTime(totalBreakTime)}</span>
             </div>
@@ -269,7 +270,7 @@ const AttendanceCard = () => {
                   rows="2"
                 />
                 <div className="flex space-x-2">
-                  <button
+                  <Button
                     onClick={handleCheckIn}
                     disabled={loading}
                     className="flex-1 btn-primary flex items-center justify-center space-x-2"
@@ -278,23 +279,23 @@ const AttendanceCard = () => {
                     <span>
                       {loading ? "Processing..." : "Confirm Check In"}
                     </span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setShowNoteInput(false)}
                     className="btn-secondary"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <button
+              <Button
                 onClick={() => setShowNoteInput(true)}
                 className="w-full btn-primary flex items-center justify-center space-x-2"
               >
                 <FaSignInAlt />
                 <span>Check In</span>
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -302,21 +303,21 @@ const AttendanceCard = () => {
         {isCheckedIn && !isCheckedOut && (
           <div className="space-y-2">
             {isOnBreak ? (
-              <button
+              <Button
                 onClick={handleEndBreak}
                 className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center space-x-2"
               >
                 <FaPlay />
                 <span>Resume Work</span>
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 onClick={handleStartBreak}
                 className="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 flex items-center justify-center space-x-2"
               >
                 <FaPause />
                 <span>Start Break</span>
-              </button>
+              </Button>
             )}
 
             {showNoteInput ? (
@@ -329,7 +330,7 @@ const AttendanceCard = () => {
                   rows="2"
                 />
                 <div className="flex space-x-2">
-                  <button
+                  <Button
                     onClick={handleCheckOut}
                     disabled={loading}
                     className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2"
@@ -338,29 +339,29 @@ const AttendanceCard = () => {
                     <span>
                       {loading ? "Processing..." : "Confirm Check Out"}
                     </span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setShowNoteInput(false)}
                     className="btn-secondary"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <button
+              <Button
                 onClick={() => setShowNoteInput(true)}
                 className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2"
               >
                 <FaSignOutAlt />
                 <span>Check Out</span>
-              </button>
+              </Button>
             )}
           </div>
         )}
 
         {isCheckedOut && (
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
+          <div className="rounded-lg bg-gray-50 p-4 text-center">
             <FaCheckCircle className="mx-auto text-green-500 text-3xl mb-2" />
             <p className="text-gray-700">You have completed your day</p>
             {todayAttendance?.workHours && (
@@ -369,7 +370,7 @@ const AttendanceCard = () => {
                   Total work hours: {todayAttendance.workHours.toFixed(2)} hrs
                 </p>
                 {totalBreakTime > 0 && (
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-xs text-gray-500">
                     Breaks: {formatTime(totalBreakTime)}
                   </p>
                 )}

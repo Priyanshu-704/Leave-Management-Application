@@ -1,7 +1,45 @@
 const User = require("../models/User");
 const Leave = require("../models/Leave");
-const bcrypt = require("bcryptjs");
 const { validationResult } = require("express-validator");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+const { FRONTEND_URL } = require("../config/appConfig");
+const { sendAccountCredentialsEmail } = require("../utils/email");
+const { FEATURE_ACCESS } = require("../config/featureAccess");
+const {
+  isSuperAdmin,
+  isAdmin,
+  canCreateRole,
+  canManageTargetUser,
+  canAccessDepartment,
+} = require("../utils/accessControl");
+
+const generateTemporaryPassword = (length = 10) => {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$%";
+  let password = "";
+  for (let i = 0; i < length; i += 1) {
+    password += chars[crypto.randomInt(0, chars.length)];
+  }
+  return password;
+};
+
+const sanitizeFeaturePermissions = (permissions = {}) => {
+  const sanitized = {};
+  Object.keys(permissions || {}).forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(FEATURE_ACCESS, key)) return;
+    if (typeof permissions[key] === "boolean") {
+      sanitized[key] = permissions[key];
+    }
+  });
+  return sanitized;
+};
+
+const isDepartmentScopedUser = (user) => ["manager"].includes(user?.role);
+
+const ensureDepartmentAccess = (req, targetDepartment) =>
+  canAccessDepartment(req.user, targetDepartment);
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -22,6 +60,19 @@ exports.getUsers = async (req, res) => {
     if (role) query.role = role;
     if (department) query.department = department;
     if (isActive !== undefined) query.isActive = isActive === "true";
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      query.department = req.user.department;
+      query.role = { $ne: "super_admin" };
+    }
+
+    if (isAdmin(req.user) && !isSuperAdmin(req.user)) {
+      if (["manager", "employee"].includes(role)) {
+        query.role = role;
+      } else {
+        query.role = { $in: ["manager", "employee"] };
+      }
+    }
 
     if (search) {
       query.$or = [
@@ -66,6 +117,18 @@ exports.getUserById = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (
+      req.params.id &&
+      !ensureDepartmentAccess(req, user.department) &&
+      user._id.toString() !== req.user.id
+    ) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (isAdmin(req.user) && !isSuperAdmin(req.user) && ["admin", "super_admin"].includes(user.role) && user._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     // Get user's leave statistics
     const leaveStats = await Leave.aggregate([
       { $match: { employee: user._id } },
@@ -102,15 +165,29 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
+    let {
       name,
       email,
       password,
       role,
+      designation,
       department,
       employeeId,
+      dateOfBirth,
+      joiningDate,
       leaveBalance,
+      sendCredentialsEmail,
     } = req.body;
+
+    if (!canCreateRole(req.user, role || "employee")) {
+      return res.status(403).json({
+        message: "Only super admin can create admin users. Admin can create manager/employee only.",
+      });
+    }
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      department = req.user.department;
+    }
 
     // Check if user exists
     const userExists = await User.findOne({ $or: [{ email }, { employeeId }] });
@@ -120,14 +197,21 @@ exports.createUser = async (req, res) => {
       });
     }
 
+    const plainPassword = password || generateTemporaryPassword();
+    const shouldSendCredentials = sendCredentialsEmail !== false;
+
     // Create user
     const user = await User.create({
       name,
       email,
-      password,
+      password: plainPassword,
       role: role || "employee",
+      designation: designation || "staff",
       department,
       employeeId,
+      dateOfBirth: dateOfBirth || null,
+      joiningDate: joiningDate || null,
+      forcePasswordChange: true,
       leaveBalance: leaveBalance || {
         annual: 20,
         sick: 10,
@@ -135,15 +219,34 @@ exports.createUser = async (req, res) => {
       },
     });
 
+    let emailWarning = null;
+    if (shouldSendCredentials) {
+      try {
+        await sendAccountCredentialsEmail({
+          to: user.email,
+          name: user.name,
+          email: user.email,
+          password: plainPassword,
+          loginUrl: `${FRONTEND_URL}/login`,
+        });
+      } catch (emailError) {
+        emailWarning =
+          emailError.message || "User created, but failed to send credentials email";
+      }
+    }
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
       department: user.department,
+      designation: user.designation,
       employeeId: user.employeeId,
       leaveBalance: user.leaveBalance,
       isActive: user.isActive,
+      credentialsSent: shouldSendCredentials && !emailWarning,
+      warning: emailWarning,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -159,6 +262,41 @@ exports.updateUser = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!ensureDepartmentAccess(req, user.department)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({ message: "Not authorized to manage this user" });
+    }
+
+    if (!canManageTargetUser(req.user, user) && user._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to manage this user" });
+    }
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      if (
+        req.body.department &&
+        req.body.department !== req.user.department
+      ) {
+        return res.status(403).json({
+          message: "Cannot move users to another department",
+        });
+      }
+
+      if (req.body.role && ["admin", "super_admin"].includes(req.body.role)) {
+        return res.status(403).json({
+          message: "Only super admin can assign admin-level roles",
+        });
+      }
+    }
+
+    if (isAdmin(req.user) && !isSuperAdmin(req.user) && req.body.role === "admin") {
+      return res.status(403).json({
+        message: "Only super admin can assign admin role",
+      });
     }
 
     // Check if email is being changed and already exists
@@ -185,7 +323,10 @@ exports.updateUser = async (req, res) => {
       "email",
       "department",
       "role",
+      "designation",
       "employeeId",
+      "dateOfBirth",
+      "joiningDate",
     ];
     updatableFields.forEach((field) => {
       if (req.body[field] !== undefined) {
@@ -209,7 +350,10 @@ exports.updateUser = async (req, res) => {
       email: updatedUser.email,
       role: updatedUser.role,
       department: updatedUser.department,
+      designation: updatedUser.designation,
       employeeId: updatedUser.employeeId,
+      dateOfBirth: updatedUser.dateOfBirth,
+      joiningDate: updatedUser.joiningDate,
       leaveBalance: updatedUser.leaveBalance,
       isActive: updatedUser.isActive,
     });
@@ -227,6 +371,16 @@ exports.deleteUser = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!ensureDepartmentAccess(req, user.department)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({
+        message: "Not authorized to manage this user",
+      });
     }
 
     // Check if user has any pending leaves
@@ -262,7 +416,7 @@ exports.updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
 
-    if (!["employee", "manager", "admin"].includes(role)) {
+    if (!["employee", "manager", "admin", "super_admin"].includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
 
@@ -270,6 +424,22 @@ exports.updateUserRole = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!ensureDepartmentAccess(req, user.department)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({
+        message: "Not authorized to update this user role",
+      });
+    }
+
+    if (!canCreateRole(req.user, role)) {
+      return res.status(403).json({
+        message: "Only super admin can assign admin role",
+      });
     }
 
     // Prevent removing the last admin
@@ -309,6 +479,10 @@ exports.updateLeaveBalance = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (!ensureDepartmentAccess(req, user.department)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     // Update leave balances
     if (annual !== undefined) user.leaveBalance.annual = annual;
     if (sick !== undefined) user.leaveBalance.sick = sick;
@@ -334,6 +508,13 @@ exports.getUserLeaveBalances = async (req, res) => {
 
     let query = { isActive: true };
     if (department) query.department = department;
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      query.department = req.user.department;
+    }
+    if (isAdmin(req.user) && !isSuperAdmin(req.user)) {
+      query.role = { $in: ["manager", "employee"] };
+    }
 
     const users = await User.find(query)
       .select("name email employeeId department leaveBalance role")
@@ -393,6 +574,25 @@ exports.bulkUpdateLeaveBalances = async (req, res) => {
   try {
     const { updates } = req.body; // Array of { userId, annual, sick, personal }
 
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ message: "No updates provided" });
+    }
+
+    if (!isSuperAdmin(req.user)) {
+      const targetUsers = await User.find({
+        _id: { $in: updates.map((u) => u.userId) },
+      }).select("department role");
+
+      const hasOutOfScopeUser = targetUsers.some(
+        (u) =>
+          !canAccessDepartment(req.user, u.department) ||
+          ["admin", "super_admin"].includes(u.role),
+      );
+      if (hasOutOfScopeUser || targetUsers.length !== updates.length) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+    }
+
     const operations = updates.map((update) => ({
       updateOne: {
         filter: { _id: update.userId },
@@ -422,6 +622,14 @@ exports.bulkUpdateLeaveBalances = async (req, res) => {
 // @access  Private/Manager/Admin
 exports.getDepartmentUsers = async (req, res) => {
   try {
+    if (
+      isDepartmentScopedUser(req.user) &&
+      !isSuperAdmin(req.user) &&
+      !canAccessDepartment(req.user, req.params.department)
+    ) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     const users = await User.find({
       department: req.params.department,
       isActive: true,
@@ -444,6 +652,16 @@ exports.toggleUserStatus = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!ensureDepartmentAccess(req, user.department)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({
+        message: "Not authorized to manage this user",
+      });
     }
 
     // Prevent deactivating the last admin
@@ -469,6 +687,93 @@ exports.toggleUserStatus = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update user permission overrides
+// @route   PUT /api/users/:id/permissions
+// @access  Private/Admin
+exports.updateUserPermissions = async (req, res) => {
+  try {
+    const { featurePermissions = {}, allowCrossDepartment, allowedDepartments = [] } = req.body || {};
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({ message: "Not authorized to manage this user" });
+    }
+
+    const sanitizedPermissions = sanitizeFeaturePermissions(featurePermissions);
+    user.featurePermissions = sanitizedPermissions;
+
+    if (typeof allowCrossDepartment === "boolean") {
+      user.allowCrossDepartment = allowCrossDepartment;
+    }
+
+    user.allowedDepartments = Array.isArray(allowedDepartments)
+      ? allowedDepartments.filter(Boolean)
+      : [];
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "User permissions updated successfully",
+      data: {
+        userId: user._id,
+        featurePermissions: user.featurePermissions,
+        allowCrossDepartment: user.allowCrossDepartment,
+        allowedDepartments: user.allowedDepartments,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Bulk update permissions for a department
+// @route   PUT /api/users/permissions/department/:department
+// @access  Private/Admin
+exports.updateDepartmentPermissions = async (req, res) => {
+  try {
+    const { department } = req.params;
+    const { featurePermissions = {}, allowCrossDepartment, allowedDepartments = [] } = req.body || {};
+
+    if (!isSuperAdmin(req.user) && !isAdmin(req.user)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const sanitizedPermissions = sanitizeFeaturePermissions(featurePermissions);
+    const update = {
+      featurePermissions: sanitizedPermissions,
+    };
+
+    if (typeof allowCrossDepartment === "boolean") {
+      update.allowCrossDepartment = allowCrossDepartment;
+    }
+
+    update.allowedDepartments = Array.isArray(allowedDepartments)
+      ? allowedDepartments.filter(Boolean)
+      : [];
+
+    const result = await User.updateMany(
+      {
+        department,
+        role: { $in: ["employee", "manager"] },
+      },
+      { $set: update },
+    );
+
+    return res.json({
+      success: true,
+      message: "Department permissions updated successfully",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -532,6 +837,7 @@ exports.changePassword = async (req, res) => {
 
     // Update password
     user.password = newPassword;
+    user.forcePasswordChange = false;
     await user.save();
 
     res.json({ message: "Password changed successfully" });
@@ -540,15 +846,70 @@ exports.changePassword = async (req, res) => {
   }
 };
 
+// @desc    Send fresh temporary credentials to user
+// @route   POST /api/users/:id/send-credentials
+// @access  Private/Admin
+exports.sendCredentialsToUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!ensureDepartmentAccess(req, user.department)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({
+        message: "Not authorized to manage this user",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(400).json({ message: "Cannot send credentials to inactive user" });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    user.password = temporaryPassword;
+    user.forcePasswordChange = true;
+    await user.save();
+
+    await sendAccountCredentialsEmail({
+      to: user.email,
+      name: user.name,
+      email: user.email,
+      password: temporaryPassword,
+      loginUrl: `${FRONTEND_URL}/login`,
+    });
+
+    return res.json({
+      success: true,
+      message: `Temporary credentials sent to ${user.email}`,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get user statistics
 // @route   GET /api/users/statistics
 // @access  Private/Manager/Admin
 exports.getUserStatistics = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ isActive: true });
+    const userMatch =
+      isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)
+        ? { department: req.user.department, role: { $ne: "super_admin" } }
+        : isAdmin(req.user) && !isSuperAdmin(req.user)
+          ? { role: { $in: ["manager", "employee"] } }
+          : {};
+
+    const totalUsers = await User.countDocuments(userMatch);
+    const activeUsers = await User.countDocuments({ ...userMatch, isActive: true });
 
     const roleStats = await User.aggregate([
+      { $match: userMatch },
       {
         $group: {
           _id: "$role",
@@ -558,6 +919,7 @@ exports.getUserStatistics = async (req, res) => {
     ]);
 
     const departmentStats = await User.aggregate([
+      { $match: userMatch },
       {
         $group: {
           _id: "$department",
@@ -566,7 +928,18 @@ exports.getUserStatistics = async (req, res) => {
       },
     ]);
 
+    const scopedUsers = await User.find(userMatch).select("_id");
+    const scopedUserIds = scopedUsers.map((u) => u._id);
+
+    const leaveMatch =
+      scopedUserIds.length > 0 || Object.keys(userMatch).length === 0
+        ? Object.keys(userMatch).length === 0
+          ? {}
+          : { employee: { $in: scopedUserIds } }
+        : { employee: null };
+
     const leaveStats = await Leave.aggregate([
+      { $match: leaveMatch },
       {
         $group: {
           _id: {
@@ -580,7 +953,7 @@ exports.getUserStatistics = async (req, res) => {
 
     // Get users with most leaves taken
     const topLeaveTakers = await Leave.aggregate([
-      { $match: { status: "approved" } },
+      { $match: { status: "approved", ...leaveMatch } },
       {
         $group: {
           _id: "$employee",
@@ -639,11 +1012,22 @@ exports.getDepartmentHeadCandidates = async (req, res) => {
 
     console.log("Fetching head candidates for department:", decodedDeptName);
 
+    if (
+      isDepartmentScopedUser(req.user) &&
+      !isSuperAdmin(req.user) &&
+      !canAccessDepartment(req.user, decodedDeptName)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
     // Build query
     let query = {
       department: decodedDeptName,
       isActive: true,
-      role: { $in: ["employee", "manager", "admin"] }, // Only employees and managers can be heads
+      role: { $in: ["employee", "manager"] }, // Only employees and managers can be heads
     };
 
     // Exclude current head if specified

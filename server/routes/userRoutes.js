@@ -18,9 +18,12 @@ const {
   toggleUserStatus,
   updateProfile,
   changePassword,
+  sendCredentialsToUser,
   getUserStatistics,
   getDepartmentHeadCandidates,
   uploadProfilePicture,
+  updateUserPermissions,
+  updateDepartmentPermissions,
 } = require("../controllers/userController");
 
 const router = express.Router();
@@ -107,10 +110,34 @@ router
     [
       body("name").notEmpty().trim(),
       body("email").isEmail().normalizeEmail(),
-      body("password").isLength({ min: 6 }),
+      body("password").optional({ checkFalsy: true }).isLength({ min: 6 }),
       body("employeeId").notEmpty(),
       body("department").notEmpty(),
       body("role").isIn(["employee", "manager", "admin"]),
+      body("designation")
+        .optional()
+        .isIn([
+          "intern",
+          "staff",
+          "senior",
+          "lead",
+          "manager",
+          "project_manager",
+          "hr",
+          "finance",
+          "it",
+          "director",
+        ]),
+      body("dateOfBirth").optional().isISO8601(),
+      body("dateOfBirth")
+        .optional()
+        .custom((value) => new Date(value) <= new Date())
+        .withMessage("Date of birth cannot be in the future"),
+      body("joiningDate").optional().isISO8601(),
+      body("joiningDate")
+        .optional()
+        .custom((value) => new Date(value) <= new Date())
+        .withMessage("Joining date cannot be in the future"),
     ],
     createUser,
   );
@@ -118,8 +145,14 @@ router
 router.route("/:id").get(getUserById).put(updateUser).delete(deleteUser);
 
 router.put("/:id/role", updateUserRole);
+router.put("/:id/permissions", updateUserPermissions);
 router.put("/:id/leave-balance", updateLeaveBalance);
 router.put("/:id/toggle-status", toggleUserStatus);
+router.post("/:id/send-credentials", sendCredentialsToUser);
+router.put(
+  "/permissions/department/:department",
+  updateDepartmentPermissions,
+);
 router.post("/bulk-update-leave-balances", bulkUpdateLeaveBalances);
 
 module.exports = router;

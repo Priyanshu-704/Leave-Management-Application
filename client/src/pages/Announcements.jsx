@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
+import { Button, Input, Select, Option } from "@/components/ui";
+import PageSkeleton from "@/components/PageSkeleton";
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import { announcementService } from "@/services/api";
 import {
   FaBullhorn,
   FaPlus,
@@ -17,14 +19,15 @@ import {
 import toast from 'react-hot-toast';
 import AnnouncementCard from '../components/AnnouncementCard';
 import CreateAnnouncementModal from '../components/modals/CreateAnnouncementModal';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import ConfirmActionModal from '../components/modals/ConfirmActionModal';
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 const Announcements = () => {
   const { isAdmin, isManager } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [announcementToEdit, setAnnouncementToEdit] = useState(null);
   const [filters, setFilters] = useState({
     type: 'all',
     priority: 'all',
@@ -36,6 +39,13 @@ const Announcements = () => {
     pages: 1,
     total: 0
   });
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+    title: ''
+  });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -51,10 +61,12 @@ const Announcements = () => {
         ...(filters.priority !== 'all' && { priority: filters.priority })
       });
 
-      const response = await axios.get(`${API_URL}/announcements?${params}`);
-      setAnnouncements(response.data.data);
-      setUnreadCount(response.data.unreadCount);
-      setPagination(response.data.pagination);
+      const response = await announcementService.getAnnouncements(
+        Object.fromEntries(params.entries()),
+      );
+      setAnnouncements(response.data);
+      setUnreadCount(response.unreadCount);
+      setPagination(response.pagination);
     } catch (error) {
       console.error('Error fetching announcements:', error);
       toast.error('Failed to fetch announcements');
@@ -65,41 +77,53 @@ const Announcements = () => {
 
   const handleAcknowledge = async (id) => {
     try {
-      await axios.post(`${API_URL}/announcements/${id}/acknowledge`);
+      await announcementService.acknowledge(id);
       toast.success('Announcement acknowledged');
       fetchAnnouncements();
     } catch (error) {
-      toast.error(error,'Failed to acknowledge');
+      toast.error(error.response?.data?.message || 'Failed to acknowledge');
     }
   };
 
   const handleComment = async (id, comment) => {
     try {
-      await axios.post(`${API_URL}/announcements/${id}/comments`, { content: comment });
+      await announcementService.addComment(id, comment);
       toast.success('Comment added');
       fetchAnnouncements();
     } catch (error) {
-      toast.error(error, 'Failed to add comment');
+      toast.error(error.response?.data?.message || 'Failed to add comment');
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this announcement?')) return;
+  const handleDelete = async () => {
+    if (!deleteConfirm.id) return;
+
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API_URL}/announcements/${id}`);
+      await announcementService.remove(deleteConfirm.id);
       toast.success('Announcement deleted');
       fetchAnnouncements();
+      setDeleteConfirm({ isOpen: false, id: null, title: '' });
     } catch (error) {
-      toast.error(error, 'Failed to delete');
+      toast.error(error.response?.data?.message || 'Failed to delete');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
-  if (loading) {
+  const filteredAnnouncements = announcements.filter((announcement) => {
+    if (!debouncedSearch) return true;
+    const searchLower = debouncedSearch.toLowerCase();
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
+      announcement.title?.toLowerCase().includes(searchLower) ||
+      announcement.message?.toLowerCase().includes(searchLower) ||
+      announcement.type?.toLowerCase().includes(searchLower) ||
+      announcement.priority?.toLowerCase().includes(searchLower)
     );
+  });
+
+  if (loading && announcements.length === 0 && !filters.search.trim()) {
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -111,13 +135,16 @@ const Announcements = () => {
           <p className="text-gray-600 mt-1">Stay updated with company news and updates</p>
         </div>
         {(isAdmin || isManager) && (
-          <button
-            onClick={() => setShowCreateModal(true)}
+          <Button
+            onClick={() => {
+              setAnnouncementToEdit(null);
+              setShowCreateModal(true);
+            }}
             className="btn-primary flex items-center space-x-2"
           >
             <FaPlus />
             <span>New Announcement</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -178,40 +205,40 @@ const Announcements = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="form-label">Type</label>
-            <select
+            <Select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Types</option>
-              <option value="general">General</option>
-              <option value="urgent">Urgent</option>
-              <option value="event">Event</option>
-              <option value="holiday">Holiday</option>
-              <option value="department">Department</option>
-            </select>
+              <Option value="all">All Types</Option>
+              <Option value="general">General</Option>
+              <Option value="urgent">Urgent</Option>
+              <Option value="event">Event</Option>
+              <Option value="holiday">Holiday</Option>
+              <Option value="department">Department</Option>
+            </Select>
           </div>
 
           <div>
             <label className="form-label">Priority</label>
-            <select
+            <Select
               value={filters.priority}
               onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Priorities</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
+              <Option value="all">All Priorities</Option>
+              <Option value="low">Low</Option>
+              <Option value="medium">Medium</Option>
+              <Option value="high">High</Option>
+              <Option value="urgent">Urgent</Option>
+            </Select>
           </div>
 
           <div>
             <label className="form-label">Search</label>
             <div className="relative">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -225,17 +252,27 @@ const Announcements = () => {
 
       {/* Announcements List */}
       <div className="space-y-4">
-        {announcements.map(announcement => (
+        {filteredAnnouncements.map(announcement => (
           <AnnouncementCard
             key={announcement._id}
             announcement={announcement}
             onAcknowledge={handleAcknowledge}
             onComment={handleComment}
-            onDelete={handleDelete}
+            onEdit={(item) => {
+              setAnnouncementToEdit(item);
+              setShowCreateModal(true);
+            }}
+            onDelete={(item) =>
+              setDeleteConfirm({
+                isOpen: true,
+                id: item._id,
+                title: item.title
+              })
+            }
           />
         ))}
 
-        {announcements.length === 0 && (
+        {filteredAnnouncements.length === 0 && (
           <div className="card text-center py-12">
             <FaBullhorn className="mx-auto text-4xl text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900">No announcements</h3>
@@ -247,36 +284,52 @@ const Announcements = () => {
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex justify-center space-x-2">
-          <button
+          <Button
             onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
             disabled={pagination.page === 1}
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
             Previous
-          </button>
+          </Button>
           <span className="px-4 py-2">
             Page {pagination.page} of {pagination.pages}
           </span>
-          <button
+          <Button
             onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
             disabled={pagination.page === pagination.pages}
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Create Announcement Modal */}
       {showCreateModal && (
         <CreateAnnouncementModal
-          onClose={() => setShowCreateModal(false)}
+          announcementToEdit={announcementToEdit}
+          onClose={() => {
+            setShowCreateModal(false);
+            setAnnouncementToEdit(null);
+          }}
           onSuccess={() => {
             fetchAnnouncements();
             setShowCreateModal(false);
+            setAnnouncementToEdit(null);
           }}
         />
       )}
+
+      <ConfirmActionModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Announcement"
+        message={`Are you sure you want to delete "${deleteConfirm.title}"?`}
+        confirmText="Delete"
+        confirmClassName="bg-red-600 hover:bg-red-700"
+        loading={deleteLoading}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, title: '' })}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 };

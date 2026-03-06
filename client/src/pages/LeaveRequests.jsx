@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Button, Input, Select, Option } from "@/components/ui";
+import PageSkeleton from "@/components/PageSkeleton";
 import { format } from 'date-fns';
 import {
   FaCheckCircle,
@@ -10,7 +12,9 @@ import {
   FaComment
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-import instance from '../services/axios';
+import { departmentService, leaveService } from "@/services/api";
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 const LeaveRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -27,6 +31,8 @@ const LeaveRequests = () => {
     status: '',
     comments: ''
   });
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
+  useBodyScrollLock(showActionModal && !!selectedRequest);
 
   useEffect(() => {
     fetchRequests();
@@ -41,8 +47,10 @@ const LeaveRequests = () => {
       if (filters.status !== 'all') params.append('status', filters.status);
       if (filters.department !== 'all') params.append('department', filters.department);
       
-      const response = await instance.get(`/leaves?${params.toString()}`);
-      setRequests(response.data);
+      const response = await leaveService.getLeaves(
+        Object.fromEntries(params.entries()),
+      );
+      setRequests(response);
     } catch (error) {
       toast.error(error, 'Failed to fetch leave requests');
     } finally {
@@ -52,9 +60,9 @@ const LeaveRequests = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await instance.get('/departments');
+      const response = await departmentService.getDepartments();
       // Handle different response structures
-      const departmentsData = response.data.data || response.data || [];
+      const departmentsData = response.data || response || [];
       setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
     } catch (error) {
       console.error(error, 'Failed to fetch departments');
@@ -64,7 +72,7 @@ const LeaveRequests = () => {
 
   const handleAction = async () => {
     try {
-      await instance.put(`/leaves/${selectedRequest._id}/status`, {
+      await leaveService.updateStatus(selectedRequest._id, {
         status: actionData.status,
         comments: actionData.comments
       });
@@ -92,8 +100,8 @@ const LeaveRequests = () => {
   };
 
   const filteredRequests = requests.filter(request => {
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (debouncedSearch) {
+      const searchLower = debouncedSearch.toLowerCase();
       return (
         request.employee?.name?.toLowerCase().includes(searchLower) ||
         request.employee?.employeeId?.toLowerCase().includes(searchLower) ||
@@ -103,12 +111,8 @@ const LeaveRequests = () => {
     return true;
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+  if (loading && requests.length === 0 && !filters.search.trim()) {
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -117,12 +121,12 @@ const LeaveRequests = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Leave Requests</h1>
         <div className="flex space-x-2">
-          <button
+          <Button
             onClick={() => fetchRequests()}
             className="btn-secondary"
           >
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -138,34 +142,34 @@ const LeaveRequests = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
             </label>
-            <select
+            <Select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
+              <Option value="all">All Status</Option>
+              <Option value="pending">Pending</Option>
+              <Option value="approved">Approved</Option>
+              <Option value="rejected">Rejected</Option>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Department
             </label>
-            <select
+            <Select
               value={filters.department}
               onChange={(e) => setFilters({ ...filters, department: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Departments</option>
+              <Option value="all">All Departments</Option>
               {departments.map((dept) => (
-                <option key={dept._id || dept} value={dept.name || dept}>
+                <Option key={dept._id || dept} value={dept.name || dept}>
                   {dept.name || dept}
-                </option>
+                </Option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
@@ -176,7 +180,7 @@ const LeaveRequests = () => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                 <FaSearch className="text-gray-400" />
               </div>
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -311,7 +315,7 @@ const LeaveRequests = () => {
                   <td className="px-6 py-4">
                     {request.status === 'pending' && (
                       <div className="flex space-x-2">
-                        <button
+                        <Button
                           onClick={() => {
                             setSelectedRequest(request);
                             setActionData({ ...actionData, status: 'approved' });
@@ -321,8 +325,8 @@ const LeaveRequests = () => {
                           title="Approve"
                         >
                           <FaCheckCircle />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => {
                             setSelectedRequest(request);
                             setActionData({ ...actionData, status: 'rejected' });
@@ -332,11 +336,11 @@ const LeaveRequests = () => {
                           title="Reject"
                         >
                           <FaTimesCircle />
-                        </button>
+                        </Button>
                       </div>
                     )}
                     {request.status !== 'pending' && (
-                      <button
+                      <Button
                         onClick={() => {
                           setSelectedRequest(request);
                           setShowActionModal(true);
@@ -345,7 +349,7 @@ const LeaveRequests = () => {
                         title="View Details"
                       >
                         <FaComment />
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -367,8 +371,16 @@ const LeaveRequests = () => {
 
       {/* Action Modal */}
       {showActionModal && selectedRequest && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+        <div
+          className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowActionModal(false);
+              setActionData({ status: '', comments: '' });
+            }
+          }}
+        >
+          <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
             <div className="mb-4">
               <h3 className="text-lg font-semibold">
                 {actionData.status ? `${actionData.status === 'approved' ? 'Approve' : 'Reject'} Leave Request` : 'Request Details'}
@@ -410,7 +422,7 @@ const LeaveRequests = () => {
               )}
 
               <div className="flex justify-end space-x-3 mt-6">
-                <button
+                <Button
                   onClick={() => {
                     setShowActionModal(false);
                     setActionData({ status: '', comments: '' });
@@ -418,16 +430,16 @@ const LeaveRequests = () => {
                   className="btn-secondary"
                 >
                   Cancel
-                </button>
+                </Button>
                 {actionData.status && (
-                  <button
+                  <Button
                     onClick={handleAction}
                     className={`btn-primary ${
                       actionData.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
                     }`}
                   >
                     {actionData.status === 'approved' ? 'Approve' : 'Reject'}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

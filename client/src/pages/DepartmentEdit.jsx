@@ -1,8 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
+import PageSkeleton from '@/components/PageSkeleton';
+import { Button, Input, Select, Option } from "@/components/ui";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import { departmentService } from "@/services/api";
 import {
   FaBuilding,
   FaSave,
@@ -15,8 +17,6 @@ import {
   FaUsers
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const DepartmentEdit = () => {
   const { id } = useParams();
@@ -63,8 +63,8 @@ const DepartmentEdit = () => {
 
   const fetchDepartmentDetails = async () => {
     try {
-      const response = await axios.get(`${API_URL}/departments/${id}`);
-      const dept = response.data.data;
+      const response = await departmentService.getDepartment(id);
+      const dept = response.data;
       setFormData({
         name: dept.name || '',
         code: dept.code || '',
@@ -89,8 +89,8 @@ const DepartmentEdit = () => {
 
   const fetchAllDepartments = async () => {
     try {
-      const response = await axios.get(`${API_URL}/departments?limit=100`);
-      const allDepts = response.data.data || [];
+      const response = await departmentService.getDepartments({ limit: 100 });
+      const allDepts = response.data || [];
       // Filter out current department to prevent self-reference
       setDepartments(allDepts.filter(dept => dept._id !== id));
     } catch (error) {
@@ -133,7 +133,7 @@ const DepartmentEdit = () => {
     setSaving(true);
     
     try {
-      await axios.put(`${API_URL}/departments/${id}`, formData);
+      await departmentService.updateDepartment(id, formData);
       toast.success('Department updated successfully');
       navigate(`/departments/${id}`);
     } catch (error) {
@@ -145,33 +145,30 @@ const DepartmentEdit = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate(`/departments/${id}`)}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <FaArrowLeft className="text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Department</h1>
-            <p className="text-gray-600">Update department information and settings</p>
+    <div className="fixed inset-0 z-40 bg-white/40 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="mx-auto w-full max-w-5xl rounded-xl border border-gray-200 bg-white p-6 shadow-xl space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={() => navigate(`/departments/${id}`)}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <FaArrowLeft className="text-gray-600" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Edit Department</h1>
+              <p className="text-gray-600">Update department information and settings</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Edit Form */}
-      <div className="card">
+        {/* Edit Form */}
+        <div className="card">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div>
@@ -182,7 +179,7 @@ const DepartmentEdit = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Department Name *</label>
-                <input
+                <Input
                   type="text"
                   name="name"
                   value={formData.name}
@@ -193,7 +190,7 @@ const DepartmentEdit = () => {
               </div>
               <div>
                 <label className="form-label">Department Code *</label>
-                <input
+                <Input
                   type="text"
                   name="code"
                   value={formData.code}
@@ -227,7 +224,7 @@ const DepartmentEdit = () => {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="form-label">Building</label>
-                <input
+                <Input
                   type="text"
                   name="location.building"
                   value={formData.location.building}
@@ -238,7 +235,7 @@ const DepartmentEdit = () => {
               </div>
               <div>
                 <label className="form-label">Floor</label>
-                <input
+                <Input
                   type="text"
                   name="location.floor"
                   value={formData.location.floor}
@@ -249,7 +246,7 @@ const DepartmentEdit = () => {
               </div>
               <div>
                 <label className="form-label">Office/Room</label>
-                <input
+                <Input
                   type="text"
                   name="location.office"
                   value={formData.location.office}
@@ -274,7 +271,7 @@ const DepartmentEdit = () => {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                     <FaEnvelope className="text-gray-400" />
                   </div>
-                  <input
+                  <Input
                     type="email"
                     name="contactInfo.email"
                     value={formData.contactInfo.email}
@@ -290,7 +287,7 @@ const DepartmentEdit = () => {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                     <FaPhone className="text-gray-400" />
                   </div>
-                  <input
+                  <Input
                     type="text"
                     name="contactInfo.phone"
                     value={formData.contactInfo.phone}
@@ -302,7 +299,7 @@ const DepartmentEdit = () => {
               </div>
               <div>
                 <label className="form-label">Extension</label>
-                <input
+                <Input
                   type="text"
                   name="contactInfo.extension"
                   value={formData.contactInfo.extension}
@@ -323,23 +320,23 @@ const DepartmentEdit = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Parent Department</label>
-                <select
+                <Select
                   name="parentDepartment"
                   value={formData.parentDepartment}
                   onChange={handleInputChange}
                   className="input-field"
                 >
-                  <option value="">None (Top Level)</option>
+                  <Option value="">None (Top Level)</Option>
                   {departments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
+                    <Option key={dept._id} value={dept._id}>
                       {dept.name} ({dept.code})
-                    </option>
+                    </Option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="form-label">Annual Budget</label>
-                <input
+                <Input
                   type="number"
                   name="budget"
                   value={formData.budget}
@@ -362,7 +359,7 @@ const DepartmentEdit = () => {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="form-label">Annual Leave (days)</label>
-                <input
+                <Input
                   type="number"
                   name="settings.defaultLeaveQuota.annual"
                   value={formData.settings.defaultLeaveQuota.annual}
@@ -373,7 +370,7 @@ const DepartmentEdit = () => {
               </div>
               <div>
                 <label className="form-label">Sick Leave (days)</label>
-                <input
+                <Input
                   type="number"
                   name="settings.defaultLeaveQuota.sick"
                   value={formData.settings.defaultLeaveQuota.sick}
@@ -384,7 +381,7 @@ const DepartmentEdit = () => {
               </div>
               <div>
                 <label className="form-label">Personal Leave (days)</label>
-                <input
+                <Input
                   type="number"
                   name="settings.defaultLeaveQuota.personal"
                   value={formData.settings.defaultLeaveQuota.personal}
@@ -399,7 +396,7 @@ const DepartmentEdit = () => {
           {/* Status */}
           <div className="border-t pt-4">
             <div className="flex items-center">
-              <input
+              <Input
                 type="checkbox"
                 id="isActive"
                 name="isActive"
@@ -415,24 +412,25 @@ const DepartmentEdit = () => {
 
           {/* Form Actions */}
           <div className="flex justify-end space-x-3 border-t pt-4">
-            <button
+            <Button
               type="button"
               onClick={() => navigate(`/departments/${id}`)}
               className="btn-secondary flex items-center space-x-2"
             >
               <FaTimes />
               <span>Cancel</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving}
               className="btn-primary flex items-center space-x-2"
             >
               <FaSave />
               <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-            </button>
+            </Button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

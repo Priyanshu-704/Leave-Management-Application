@@ -1,6 +1,27 @@
 const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const Leave = require("../models/Leave");
+const WorkforcePolicy = require("../models/WorkforcePolicy");
+const Holiday = require("../models/Holiday");
+const { SHIFT_START_TIME, SHIFT_END_TIME } = require("../config/appConfig");
+
+const getDefaultPolicy = async () => WorkforcePolicy.findOneAndUpdate(
+  { key: "default" },
+  { $setOnInsert: { key: "default" } },
+  { new: true, upsert: true },
+);
+
+const haversineMeters = (lat1, lon1, lat2, lon2) => {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 // @desc    Check In
 // @route   POST /api/attendance/checkin
@@ -8,6 +29,11 @@ const Leave = require("../models/Leave");
 exports.checkIn = async (req, res) => {
   try {
     const { location, note, photo } = req.body;
+    const policy = await getDefaultPolicy();
+
+    if (policy?.attendance?.checkInEnabled === false) {
+      return res.status(403).json({ message: "Check-in is disabled by admin policy" });
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -43,6 +69,20 @@ exports.checkIn = async (req, res) => {
       status = "on-leave";
     }
 
+    const isHoliday = await Holiday.findOne({
+      date: {
+        $gte: new Date(today),
+        $lt: new Date(tomorrow),
+      },
+    });
+    const weekendDays = policy?.holidayWeekend?.weekendDays || [0, 6];
+    if (weekendDays.includes(today.getDay())) {
+      status = "weekend";
+    }
+    if (isHoliday) {
+      status = "holiday";
+    }
+
     // Get client IP
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
@@ -61,6 +101,18 @@ exports.checkIn = async (req, res) => {
       Array.isArray(location.coordinates) &&
       location.coordinates.length === 2
     ) {
+      const fence = policy?.attendance?.officeGeoFence || {};
+      if (fence.latitude !== null && fence.longitude !== null) {
+        const [longitude, latitude] = location.coordinates;
+        const distance = haversineMeters(latitude, longitude, fence.latitude, fence.longitude);
+        if (distance > Number(fence.radiusMeters || 200)) {
+          return res.status(400).json({
+            message: `Outside office geo-fence. Allowed radius: ${fence.radiusMeters}m`,
+            distanceMeters: Math.round(distance),
+          });
+        }
+      }
+
       checkInData.location = {
         type: "Point",
         coordinates: location.coordinates,
@@ -76,8 +128,8 @@ exports.checkIn = async (req, res) => {
       createdBy: req.user.id,
     });
 
-    // Check if late (assuming 9:00 AM start time)
-    attendance.checkLate("09:00");
+    // Check if late based on configured shift start time
+    attendance.checkLate(SHIFT_START_TIME.text);
     await attendance.save();
 
     res.status(201).json({
@@ -157,12 +209,13 @@ exports.checkOut = async (req, res) => {
     // Calculate work hours
     attendance.calculateWorkHours();
 
-    // Check for early departure (assuming 6:00 PM end time)
+    // Check for early departure using configured shift end time.
     if (attendance.checkOut.time) {
       const checkOutHour = attendance.checkOut.time.getHours();
-      if (checkOutHour < 18) {
+      const targetHour = SHIFT_END_TIME.hour;
+      if (checkOutHour < targetHour) {
         attendance.earlyDeparture = true;
-        attendance.earlyDepartureMinutes = (18 - checkOutHour) * 60;
+        attendance.earlyDepartureMinutes = (targetHour - checkOutHour) * 60;
       }
     }
 

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import PageSkeleton from '@/components/PageSkeleton';
+import { Button } from "@/components/ui";
+import { departmentService } from "@/services/api";
 import {
   FaDownload,
   FaUsers,
@@ -24,8 +26,6 @@ import {
 } from 'recharts';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const DepartmentAnalytics = () => {
@@ -39,8 +39,8 @@ const DepartmentAnalytics = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await axios.get(`${API_URL}/departments/analytics`);
-      setAnalytics(response.data.data);
+      const response = await departmentService.getAnalytics();
+      setAnalytics(response.data);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast.error('Failed to fetch analytics');
@@ -60,11 +60,7 @@ const DepartmentAnalytics = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   // Calculate totals
@@ -91,24 +87,24 @@ const DepartmentAnalytics = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button
+          <Button
             onClick={() => navigate('/departments')}
             className="p-2 hover:bg-gray-100 rounded-lg"
           >
             <FaArrowLeft className="text-gray-600" />
-          </button>
+          </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Department Analytics</h1>
             <p className="text-gray-600">Comprehensive overview of all departments</p>
           </div>
         </div>
-        <button
+        <Button
           onClick={exportData}
           className="btn-outline flex items-center space-x-2"
         >
           <FaDownload />
           <span>Export Data</span>
-        </button>
+        </Button>
       </div>
 
       {/* Global Stats */}

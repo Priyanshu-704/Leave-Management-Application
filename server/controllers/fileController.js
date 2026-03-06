@@ -1,9 +1,8 @@
 const File = require('../models/File');
-const Folder = require('../models/Folder');
-const User = require('../models/User');
 const path = require('path');
 const fs = require('fs');
-const mongoose = require('mongoose');
+
+const isSuperAdmin = (user) => user?.role === 'super_admin';
 
 // @desc    Upload file
 // @route   POST /api/files/upload
@@ -63,8 +62,8 @@ exports.uploadFile = async (req, res) => {
       folder: folderId || undefined
     };
 
-    // If manager, restrict to their department
-    if (req.user.role === 'manager') {
+    // Restrict non-super admins/managers to their department
+    if (['manager', 'admin'].includes(req.user.role) && !isSuperAdmin(req.user)) {
       fileData.accessControl.allowedDepartments = [req.user.department];
       fileData.department = req.user.department;
     }
@@ -144,8 +143,16 @@ exports.getFiles = async (req, res) => {
     }
 
     // Role-based filtering
-    if (req.user.role === 'admin') {
-      // Admin sees everything
+    if (isSuperAdmin(req.user)) {
+      // Super admin sees everything
+    } else if (req.user.role === 'admin') {
+      // Department admin sees only department-related files
+      query.$or = [
+        { department: req.user.department },
+        { uploadedBy: req.user.id },
+        { 'accessControl.allowedDepartments': req.user.department },
+        { 'accessControl.type': 'public' }
+      ];
     } else if (req.user.role === 'manager') {
       // Managers see their department files + public files
       query.$or = [
@@ -283,9 +290,11 @@ exports.updateFile = async (req, res) => {
     }
 
     // Check permission
-    if (req.user.role !== 'admin' && 
-        file.uploadedBy.toString() !== req.user.id &&
-        (req.user.role === 'manager' && file.department !== req.user.department)) {
+    if (
+      !isSuperAdmin(req.user) &&
+      file.uploadedBy.toString() !== req.user.id &&
+      file.department !== req.user.department
+    ) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -326,9 +335,11 @@ exports.deleteFile = async (req, res) => {
     }
 
     // Check permission
-    if (req.user.role !== 'admin' && 
-        file.uploadedBy.toString() !== req.user.id &&
-        (req.user.role === 'manager' && file.department !== req.user.department)) {
+    if (
+      !isSuperAdmin(req.user) &&
+      file.uploadedBy.toString() !== req.user.id &&
+      file.department !== req.user.department
+    ) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -369,8 +380,11 @@ exports.uploadNewVersion = async (req, res) => {
     }
 
     // Check permission
-    if (req.user.role !== 'admin' && 
-        file.uploadedBy.toString() !== req.user.id) {
+    if (
+      !isSuperAdmin(req.user) &&
+      file.uploadedBy.toString() !== req.user.id &&
+      file.department !== req.user.department
+    ) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -411,7 +425,13 @@ exports.uploadNewVersion = async (req, res) => {
 // @access  Private/Admin
 exports.getFileStats = async (req, res) => {
   try {
+    const matchStage =
+      ['admin', 'manager'].includes(req.user.role) && !isSuperAdmin(req.user)
+        ? { department: req.user.department }
+        : {};
+
     const stats = await File.aggregate([
+      { $match: matchStage },
       {
         $group: {
           _id: null,
@@ -430,14 +450,14 @@ exports.getFileStats = async (req, res) => {
     ]);
 
     // Get recent uploads
-    const recent = await File.find()
+    const recent = await File.find(matchStage)
       .sort('-createdAt')
       .limit(5)
       .populate('uploadedBy', 'name')
       .select('originalName fileSize createdAt downloadCount');
 
     // Get popular files
-    const popular = await File.find()
+    const popular = await File.find(matchStage)
       .sort('-downloadCount')
       .limit(5)
       .populate('uploadedBy', 'name')

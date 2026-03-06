@@ -242,6 +242,11 @@ const settingSchema = new mongoose.Schema({
       type: String,
       default: '#4f46e5'
     },
+    colorScheme: {
+      type: String,
+      enum: ['light', 'dark'],
+      default: 'light'
+    },
     logoLight: String,
     logoDark: String,
     favicon: String,

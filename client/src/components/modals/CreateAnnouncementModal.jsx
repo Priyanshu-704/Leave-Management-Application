@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
+import { Button, Input, Select, Option, MultiSelect } from "@/components/ui";
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import { announcementService, departmentService } from "@/services/api";
 import { FaTimes, FaPaperclip, FaBullhorn } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
+const CreateAnnouncementModal = ({ onClose, onSuccess, announcementToEdit = null }) => {
+  useBodyScrollLock(true);
   const { user, isAdmin } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [formData, setFormData] = useState({
@@ -20,16 +21,35 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
     expiryDate: new Date(+new Date() + 30*24*60*60*1000).toISOString().split('T')[0]
   });
   const [attachments, setAttachments] = useState([]);
+  const [existingAttachments, setExistingAttachments] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
-  }, []);
+    if (announcementToEdit) {
+      setFormData({
+        title: announcementToEdit.title || '',
+        content: announcementToEdit.content || '',
+        type: announcementToEdit.type || 'general',
+        priority: announcementToEdit.priority || 'medium',
+        targetDepartments: announcementToEdit.targetDepartments || [],
+        targetRoles: announcementToEdit.targetRoles || ['all'],
+        pinned: !!announcementToEdit.pinned,
+        expiryDate: announcementToEdit.expiryDate
+          ? new Date(announcementToEdit.expiryDate).toISOString().split('T')[0]
+          : new Date(+new Date() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+      setExistingAttachments(announcementToEdit.attachments || []);
+    }
+    if (!announcementToEdit) {
+      setExistingAttachments([]);
+    }
+  }, [announcementToEdit]);
 
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get(`${API_URL}/departments?limit=100`);
-      setDepartments(response.data.data || []);
+      const response = await departmentService.getDepartments({ limit: 100 });
+      setDepartments(response.data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
     }
@@ -41,30 +61,6 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
       ...formData,
       [name]: type === 'checkbox' ? checked : value
     });
-  };
-
-  const handleDepartmentChange = (e) => {
-    const options = e.target.options;
-    const selected = [];
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        selected.push(options[i].value);
-      }
-    }
-    setFormData({
-      ...formData,
-      targetDepartments: selected
-    });
-  };
-
-  const handleRoleChange = (role) => {
-    let newRoles = [...formData.targetRoles];
-    if (newRoles.includes(role)) {
-      newRoles = newRoles.filter(r => r !== role);
-    } else {
-      newRoles.push(role);
-    }
-    setFormData({ ...formData, targetRoles: newRoles });
   };
 
   const handleFileChange = (e) => {
@@ -79,21 +75,22 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
       // Upload files first if any
       const uploadedFiles = [];
       if (attachments.length > 0) {
-        // Implement file upload logic here
-        // const formData = new FormData();
-        // attachments.forEach(file => formData.append('files', file));
-        // const uploadRes = await axios.post(`${API_URL}/upload`, formData);
-        // uploadedFiles = uploadRes.data.files;
+        // Attachments can be integrated with file upload service when needed.
       }
 
       const announcementData = {
         ...formData,
-        attachments: uploadedFiles,
+        attachments: uploadedFiles.length > 0 ? uploadedFiles : existingAttachments,
         expiryDate: new Date(formData.expiryDate)
       };
 
-      await axios.post(`${API_URL}/announcements`, announcementData);
-      toast.success('Announcement created successfully');
+      if (announcementToEdit?._id) {
+        await announcementService.update(announcementToEdit._id, announcementData);
+        toast.success('Announcement updated successfully');
+      } else {
+        await announcementService.create(announcementData);
+        toast.success('Announcement created successfully');
+      }
       onSuccess();
     } catch (error) {
       console.error('Error creating announcement:', error);
@@ -104,23 +101,28 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+    <div
+      className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative my-6 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold flex items-center">
             <FaBullhorn className="mr-2 text-primary-600" />
-            Create New Announcement
+            {announcementToEdit ? 'Edit Announcement' : 'Create New Announcement'}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
             <label className="form-label">Title *</label>
-            <input
+            <Input
               type="text"
               name="title"
               value={formData.title}
@@ -149,73 +151,65 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Type</label>
-              <select
+              <Select
                 name="type"
                 value={formData.type}
                 onChange={handleInputChange}
                 className="input-field"
               >
-                <option value="general">General</option>
-                <option value="urgent">Urgent</option>
-                <option value="event">Event</option>
-                <option value="holiday">Holiday</option>
-                <option value="department">Department</option>
-                <option value="other">Other</option>
-              </select>
+                <Option value="general">General</Option>
+                <Option value="urgent">Urgent</Option>
+                <Option value="event">Event</Option>
+                <Option value="holiday">Holiday</Option>
+                <Option value="department">Department</Option>
+                <Option value="other">Other</Option>
+              </Select>
             </div>
 
             <div>
               <label className="form-label">Priority</label>
-              <select
+              <Select
                 name="priority"
                 value={formData.priority}
                 onChange={handleInputChange}
                 className="input-field"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
+                <Option value="low">Low</Option>
+                <Option value="medium">Medium</Option>
+                <Option value="high">High</Option>
+                <Option value="urgent">Urgent</Option>
+              </Select>
             </div>
           </div>
 
           {/* Target Audience */}
           <div>
             <label className="form-label">Target Roles</label>
-            <div className="flex flex-wrap gap-3 mt-2">
-              {['all', 'admin', 'manager', 'employee'].map(role => (
-                <label key={role} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.targetRoles.includes(role)}
-                    onChange={() => handleRoleChange(role)}
-                    disabled={role === 'admin' && !isAdmin}
-                    className="h-4 w-4 text-primary-600 rounded"
-                  />
-                  <span className="text-sm capitalize">{role === 'all' ? 'Everyone' : role}</span>
-                </label>
-              ))}
-            </div>
+            <MultiSelect
+              options={['all', 'admin', 'manager', 'employee']
+                .filter((role) => role !== 'admin' || isAdmin)
+                .map((role) => ({
+                  value: role,
+                  label: role === 'all' ? 'Everyone' : role.charAt(0).toUpperCase() + role.slice(1),
+                }))}
+              values={formData.targetRoles || []}
+              onChange={(selected) => setFormData({ ...formData, targetRoles: selected })}
+              placeholder="Select role to add"
+              summaryLabel="You selected roles"
+            />
           </div>
 
           {/* Target Departments */}
           {isAdmin && (
             <div>
               <label className="form-label">Target Departments</label>
-              <select
-                multiple
-                value={formData.targetDepartments}
-                onChange={handleDepartmentChange}
-                className="input-field h-32"
-              >
-                {departments.map(dept => (
-                  <option key={dept._id} value={dept.name}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+              <MultiSelect
+                options={departments.map((dept) => ({ value: dept.name, label: dept.name }))}
+                values={formData.targetDepartments || []}
+                onChange={(selected) => setFormData({ ...formData, targetDepartments: selected })}
+                placeholder="Select department to add"
+                summaryLabel="You selected departments"
+              />
             </div>
           )}
 
@@ -232,7 +226,7 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Expiry Date</label>
-              <input
+              <Input
                 type="date"
                 name="expiryDate"
                 value={formData.expiryDate}
@@ -244,7 +238,7 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
 
             <div className="flex items-center">
               <label className="flex items-center space-x-2">
-                <input
+                <Input
                   type="checkbox"
                   name="pinned"
                   checked={formData.pinned}
@@ -260,7 +254,7 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
           <div>
             <label className="form-label">Attachments</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-              <input
+              <Input
                 type="file"
                 multiple
                 onChange={handleFileChange}
@@ -284,20 +278,22 @@ const CreateAnnouncementModal = ({ onClose, onSuccess }) => {
 
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4">
-            <button
+            <Button
               type="button"
               onClick={onClose}
               className="btn-secondary"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
               className="btn-primary"
             >
-              {submitting ? 'Creating...' : 'Create Announcement'}
-            </button>
+              {submitting
+                ? (announcementToEdit ? 'Updating...' : 'Creating...')
+                : (announcementToEdit ? 'Update Announcement' : 'Create Announcement')}
+            </Button>
           </div>
         </form>
       </div>

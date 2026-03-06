@@ -1,27 +1,35 @@
 /* eslint-disable no-unused-vars */
+import { Button, Input } from "@/components/ui";
 import { FaTimes, FaUserCircle, FaUserTie } from 'react-icons/fa';
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const DepartmentHeadModal = ({ isOpen, onClose, onSelect, users, loading }) => {
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+    <div
+      className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold flex items-center">
             <FaUserTie className="mr-2 text-primary-600" />
             Select Department Head
           </h3>
-          <button
+          <Button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
             <FaTimes />
-          </button>
+          </Button>
         </div>
 
         <div className="mb-3">
-          <input
+          <Input
             type="text"
             placeholder="Search users..."
             className="input-field"
@@ -42,7 +50,7 @@ const DepartmentHeadModal = ({ isOpen, onClose, onSelect, users, loading }) => {
             </div>
           ) : (
             users.map((user) => (
-              <button
+              <Button
                 key={user._id}
                 onClick={() => onSelect(user._id)}
                 className="w-full text-left p-3 hover:bg-gray-50 rounded-lg flex items-center space-x-3 border border-gray-100 hover:border-primary-200 transition-all"
@@ -60,7 +68,7 @@ const DepartmentHeadModal = ({ isOpen, onClose, onSelect, users, loading }) => {
                     <span className="text-xs text-gray-400">ID: {user.employeeId}</span>
                   </div>
                 </div>
-              </button>
+              </Button>
             ))
           )}
         </div>

@@ -9,14 +9,16 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 // Import User model
 const User = require('../models/User');
 
+const roleArg = process.argv.includes('--super-admin') ? 'super_admin' : 'admin';
+
 // Admin user data
 const adminData = {
   name: 'System Administrator',
   email: 'admin@company.com',
-  password: 'Admin@123',
+  password: 'admin@123',
   employeeId: 'ADMIN001',
   department: 'Administration',
-  role: 'admin',
+  role: roleArg,
   leaveBalance: {
     annual: 30,
     sick: 15,
@@ -41,7 +43,7 @@ const createAdmin = async () => {
     });
 
     if (existingAdmin) {
-      console.log('Admin user already exists:');
+      console.log(`${roleArg} user already exists:`);
       console.log({
         name: existingAdmin.name,
         email: existingAdmin.email,
@@ -54,7 +56,7 @@ const createAdmin = async () => {
       if (updatePassword) {
         existingAdmin.password = adminData.password;
         await existingAdmin.save();
-        console.log('Admin password updated successfully');
+        console.log(`${roleArg} password updated successfully`);
       }
       
       await mongoose.disconnect();
@@ -62,10 +64,10 @@ const createAdmin = async () => {
     }
 
     // Create new admin user
-    console.log('Creating new admin user...');
+    console.log(`Creating new ${roleArg} user...`);
     const admin = await User.create(adminData);
     
-    console.log('✅ Admin user created successfully:');
+    console.log(`✅ ${roleArg} user created successfully:`);
     console.log({
       id: admin._id,
       name: admin.name,
@@ -82,7 +84,7 @@ const createAdmin = async () => {
     console.log('\n⚠️  Please change the password after first login!');
 
   } catch (error) {
-    console.error('❌ Error creating admin user:', error.message);
+    console.error(`❌ Error creating ${roleArg} user:`, error.message);
     if (error.code === 11000) {
       console.error('Duplicate key error. Admin with this email or employee ID may already exist.');
     }

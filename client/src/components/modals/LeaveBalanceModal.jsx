@@ -1,6 +1,9 @@
 import { FaTimes } from 'react-icons/fa';
+import { Button, Input } from "@/components/ui";
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const LeaveBalanceModal = ({ isOpen, onClose, onSubmit, formData, setFormData, selectedUser }) => {
+  useBodyScrollLock(isOpen && !!selectedUser);
   if (!isOpen || !selectedUser) return null;
 
   const handleInputChange = (e) => {
@@ -9,22 +12,27 @@ const LeaveBalanceModal = ({ isOpen, onClose, onSubmit, formData, setFormData, s
       ...formData,
       leaveBalance: {
         ...formData.leaveBalance,
-        [name]: parseInt(value) || 0,
+        [name]: value === '' ? '' : parseInt(value, 10),
       },
     });
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+    <div
+      className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto justify-center flex items-center"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Update Leave Balance</h3>
-          <button
+          <Button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
             <FaTimes />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -38,54 +46,57 @@ const LeaveBalanceModal = ({ isOpen, onClose, onSubmit, formData, setFormData, s
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Annual
               </label>
-              <input
+              <Input
                 type="number"
                 name="annual"
                 value={formData.leaveBalance.annual}
                 onChange={handleInputChange}
                 className="input-field"
                 min="0"
+                placeholder="Annual balance"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Sick
               </label>
-              <input
+              <Input
                 type="number"
                 name="sick"
                 value={formData.leaveBalance.sick}
                 onChange={handleInputChange}
                 className="input-field"
                 min="0"
+                placeholder="Sick balance"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Personal
               </label>
-              <input
+              <Input
                 type="number"
                 name="personal"
                 value={formData.leaveBalance.personal}
                 onChange={handleInputChange}
                 className="input-field"
                 min="0"
+                placeholder="Personal balance"
               />
             </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
-            <button
+            <Button
               type="button"
               onClick={onClose}
               className="btn-secondary"
             >
               Cancel
-            </button>
-            <button type="submit" className="btn-primary">
+            </Button>
+            <Button type="submit" className="btn-primary">
               Update Balance
-            </button>
+            </Button>
           </div>
         </form>
       </div>

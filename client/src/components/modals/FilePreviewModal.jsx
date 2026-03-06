@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { 
+import { Button } from "@/components/ui";
+import {
   FaTimes, 
   FaDownload, 
   FaFilePdf, 
@@ -17,8 +18,10 @@ import {
   FaUsers
 } from 'react-icons/fa';
 import { format } from 'date-fns';
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const FilePreviewModal = ({ file, onClose, onDownload }) => {
+  useBodyScrollLock(true);
   const [activeTab, setActiveTab] = useState('preview');
 
   const getFileIcon = (fileType) => {
@@ -49,8 +52,13 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
   const isPDF = file?.fileType?.includes('pdf');
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-lg bg-white">
+    <div
+      className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative my-6 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-lg bg-white">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-3">
@@ -64,18 +72,18 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
               </p>
             </div>
           </div>
-          <button
+          <Button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
             <FaTimes />
-          </button>
+          </Button>
         </div>
 
         {/* Tabs */}
         <div className="border-b mb-4">
           <nav className="flex space-x-8">
-            <button
+            <Button
               onClick={() => setActiveTab('preview')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'preview'
@@ -85,8 +93,8 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
             >
               <FaEye className="inline mr-2" />
               Preview
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setActiveTab('details')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'details'
@@ -96,7 +104,7 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
             >
               <FaInfoCircle className="inline mr-2" />
               Details
-            </button>
+            </Button>
           </nav>
         </div>
 
@@ -116,12 +124,12 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
                 <div className="text-center p-8">
                   <FaFilePdf className="text-6xl text-red-500 mx-auto mb-4" />
                   <p className="text-gray-600 mb-4">PDF preview not available</p>
-                  <button
+                  <Button
                     onClick={() => onDownload(file)}
                     className="btn-primary"
                   >
                     Download to View
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="text-center p-8">
@@ -129,12 +137,12 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
                   <p className="text-gray-600 mt-4 mb-4">
                     Preview not available for this file type
                   </p>
-                  <button
+                  <Button
                     onClick={() => onDownload(file)}
                     className="btn-primary"
                   >
                     Download File
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -274,19 +282,19 @@ const FilePreviewModal = ({ file, onClose, onDownload }) => {
 
         {/* Footer */}
         <div className="flex justify-end space-x-3 mt-4 pt-3 border-t">
-          <button
+          <Button
             onClick={onClose}
             className="btn-secondary"
           >
             Close
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => onDownload(file)}
             className="btn-primary flex items-center space-x-2"
           >
             <FaDownload />
             <span>Download</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

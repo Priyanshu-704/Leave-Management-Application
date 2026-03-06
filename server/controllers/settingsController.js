@@ -2,6 +2,38 @@ const Setting = require('../models/Setting');
 const User = require('../models/User');
 const Department = require('../models/Department');
 
+// @desc    Get public settings
+// @route   GET /api/settings/public
+// @access  Public
+exports.getPublicSettings = async (req, res) => {
+  try {
+    const settings = await Setting.getSettings();
+
+    res.json({
+      success: true,
+      data: {
+        company: {
+          name: settings.company?.name || 'My Company',
+          logo: settings.company?.logo || null,
+          favicon: settings.company?.favicon || null
+        },
+        themeSettings: {
+          primaryColor: settings.themeSettings?.primaryColor || '#2563eb',
+          secondaryColor: settings.themeSettings?.secondaryColor || '#4f46e5',
+          colorScheme: settings.themeSettings?.colorScheme || 'light',
+          customCSS: settings.themeSettings?.customCSS || ''
+        },
+        featureToggles: settings.featureToggles || {},
+        version: settings.version || 1,
+        updatedAt: settings.updatedAt || null
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching public settings:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get all settings
 // @route   GET /api/settings
 // @access  Private/Admin
@@ -41,6 +73,9 @@ exports.updateSettings = async (req, res) => {
     }
     if (updates.securitySettings) {
       validateSecuritySettings(updates.securitySettings);
+    }
+    if (updates.themeSettings) {
+      validateThemeSettings(updates.themeSettings);
     }
 
     // Update with audit trail
@@ -269,6 +304,23 @@ function validateSecuritySettings(settings) {
   }
   if (settings.sessionTimeout && settings.sessionTimeout < 5) {
     throw new Error('Session timeout must be at least 5 minutes');
+  }
+}
+
+function validateThemeSettings(settings) {
+  const isValidHex = (value) =>
+    /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+
+  if (settings.primaryColor && !isValidHex(settings.primaryColor)) {
+    throw new Error('Primary color must be a valid hex value');
+  }
+
+  if (settings.secondaryColor && !isValidHex(settings.secondaryColor)) {
+    throw new Error('Secondary color must be a valid hex value');
+  }
+
+  if (settings.colorScheme && !['light', 'dark'].includes(settings.colorScheme)) {
+    throw new Error('Color scheme must be either light or dark');
   }
 }
 

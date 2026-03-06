@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { Button, Input, Select, Option } from "@/components/ui";
+import PageSkeleton from "@/components/PageSkeleton";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import { fileService } from "@/services/api";
 import {
   FaUpload,
   FaFile,
@@ -22,8 +24,8 @@ import { formatDistanceToNow } from "date-fns";
 import toast from "react-hot-toast";
 import UploadFileModal from "../components/modals/UploadFileModal";
 import FilePreviewModal from "../components/modals/FilePreviewModal";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import ConfirmActionModal from "../components/modals/ConfirmActionModal";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 const FileManagement = () => {
   const { user, isAdmin, isManager } = useAuth();
@@ -44,15 +46,15 @@ const FileManagement = () => {
     pages: 1,
     total: 0,
   });
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+    name: "",
+  });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const debouncedSearch = useDebouncedValue(filters.search, 350);
 
-  useEffect(() => {
-    fetchFiles();
-    if (isAdmin) {
-      fetchStats();
-    }
-  }, [filters, pagination.page]);
-
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -60,38 +62,40 @@ const FileManagement = () => {
         limit: 20,
         ...(filters.category !== "all" && { category: filters.category }),
         ...(filters.type !== "all" && { type: filters.type }),
-        ...(filters.search && { search: filters.search }),
+        ...(debouncedSearch && { search: debouncedSearch }),
       });
 
-      const response = await axios.get(`${API_URL}/files?${params}`);
-      setFiles(response.data.data);
-      setCategories(response.data.categories || []);
-      setPagination(response.data.pagination);
+      const response = await fileService.getFiles(Object.fromEntries(params.entries()));
+      setFiles(response.data);
+      setCategories(response.categories || []);
+      setPagination(response.pagination);
     } catch (error) {
       console.error("Error fetching files:", error);
       toast.error("Failed to fetch files");
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.category, filters.type, debouncedSearch, pagination.page]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_URL}/files/stats`);
-      setStats(response.data.data);
+      const response = await fileService.getStats();
+      setStats(response.data);
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchFiles();
+    if (isAdmin) {
+      fetchStats();
+    }
+  }, [fetchFiles, fetchStats, isAdmin]);
 
   const handleDownload = async (file) => {
     try {
-      const response = await axios.get(
-        `${API_URL}/files/${file._id}/download`,
-        {
-          responseType: "blob",
-        },
-      );
+      const response = await fileService.downloadFile(file._id);
 
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -108,16 +112,20 @@ const FileManagement = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this file?")) return;
+  const handleDelete = async () => {
+    if (!deleteConfirm.id) return;
 
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API_URL}/files/${id}`);
+      await fileService.remove(deleteConfirm.id);
       toast.success("File deleted successfully");
       fetchFiles();
       if (isAdmin) fetchStats();
+      setDeleteConfirm({ isOpen: false, id: null, name: "" });
     } catch (error) {
       toast.error(error, "Failed to delete file");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -142,12 +150,8 @@ const FileManagement = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+  if (loading && files.length === 0 && !filters.search.trim()) {
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -161,13 +165,13 @@ const FileManagement = () => {
           </p>
         </div>
         {(isAdmin || isManager) && (
-          <button
+          <Button
             onClick={() => setShowUploadModal(true)}
             className="btn-primary flex items-center space-x-2"
           >
             <FaUpload />
             <span>Upload File</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -234,42 +238,42 @@ const FileManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="form-label">Category</label>
-            <select
+            <Select
               value={filters.category}
               onChange={(e) =>
                 setFilters({ ...filters, category: e.target.value })
               }
               className="input-field"
             >
-              <option value="all">All Categories</option>
+              <Option value="all">All Categories</Option>
               {categories.map((cat) => (
-                <option key={cat} value={cat} className="capitalize">
+                <Option key={cat} value={cat} className="capitalize">
                   {cat}
-                </option>
+                </Option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
             <label className="form-label">File Type</label>
-            <select
+            <Select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Types</option>
-              <option value="pdf">PDF</option>
-              <option value="image">Images</option>
-              <option value="document">Documents</option>
-              <option value="spreadsheet">Spreadsheets</option>
-            </select>
+              <Option value="all">All Types</Option>
+              <Option value="pdf">PDF</Option>
+              <Option value="image">Images</Option>
+              <Option value="document">Documents</Option>
+              <Option value="spreadsheet">Spreadsheets</Option>
+            </Select>
           </div>
 
           <div>
             <label className="form-label">Search</label>
             <div className="relative">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) =>
@@ -360,7 +364,7 @@ const FileManagement = () => {
 
             {/* Actions */}
             <div className="flex items-center justify-end space-x-2 pt-2 border-t">
-              <button
+              <Button
                 onClick={() => {
                   setSelectedFile(file);
                   setShowPreviewModal(true);
@@ -369,29 +373,35 @@ const FileManagement = () => {
                 title="Preview"
               >
                 <FaEye />
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleDownload(file)}
                 className="p-2 text-green-600 hover:bg-green-50 rounded"
                 title="Download"
               >
                 <FaDownload />
-              </button>
+              </Button>
               {(isAdmin || file.uploadedBy?._id === user?._id) && (
                 <>
-                  <button
+                  <Button
                     className="p-2 text-purple-600 hover:bg-purple-50 rounded"
                     title="Share"
                   >
                     <FaShare />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(file._id)}
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      setDeleteConfirm({
+                        isOpen: true,
+                        id: file._id,
+                        name: file.originalName,
+                      })
+                    }
                     className="p-2 text-red-600 hover:bg-red-50 rounded"
                     title="Delete"
                   >
                     <FaTrash />
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -402,7 +412,7 @@ const FileManagement = () => {
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex justify-center space-x-2">
-          <button
+          <Button
             onClick={() =>
               setPagination({ ...pagination, page: pagination.page - 1 })
             }
@@ -410,11 +420,11 @@ const FileManagement = () => {
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
             Previous
-          </button>
+          </Button>
           <span className="px-4 py-2">
             Page {pagination.page} of {pagination.pages}
           </span>
-          <button
+          <Button
             onClick={() =>
               setPagination({ ...pagination, page: pagination.page + 1 })
             }
@@ -422,7 +432,7 @@ const FileManagement = () => {
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
 
@@ -449,6 +459,17 @@ const FileManagement = () => {
           onDownload={handleDownload}
         />
       )}
+
+      <ConfirmActionModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete File"
+        message={`Are you sure you want to delete "${deleteConfirm.name}"?`}
+        confirmText="Delete"
+        confirmClassName="bg-red-600 hover:bg-red-700"
+        loading={deleteLoading}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, name: "" })}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 };

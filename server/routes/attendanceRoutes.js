@@ -1,5 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
+const { validate } = require("../middleware/joiValidation");
+const { checkInSchema, checkOutSchema } = require("../validators/attendanceValidators");
 const {
   checkIn,
   checkOut,
@@ -18,8 +20,8 @@ const router = express.Router();
 router.use(protect);
 
 // Employee routes
-router.post('/checkin', checkIn);
-router.put('/checkout', checkOut);
+router.post('/checkin', validate(checkInSchema), checkIn);
+router.put('/checkout', validate(checkOutSchema), checkOut);
 router.get('/today', getTodayAttendance);
 router.get('/history', getAttendanceHistory);
 router.post('/break', addBreak);

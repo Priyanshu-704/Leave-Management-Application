@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema({
   profilePicture: {
@@ -25,12 +26,36 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ["employee", "manager", "admin"],
+    enum: ["employee", "manager", "admin", "super_admin"],
     default: "employee",
+  },
+  designation: {
+    type: String,
+    enum: [
+      "intern",
+      "staff",
+      "senior",
+      "lead",
+      "manager",
+      "project_manager",
+      "hr",
+      "finance",
+      "it",
+      "director",
+    ],
+    default: "staff",
   },
   department: {
     type: String,
     required: true,
+  },
+  dateOfBirth: {
+    type: Date,
+    default: null,
+  },
+  joiningDate: {
+    type: Date,
+    default: null,
   },
   employeeId: {
     type: String,
@@ -46,6 +71,73 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  resetPasswordToken: {
+    type: String,
+    default: null,
+  },
+  resetPasswordExpire: {
+    type: Date,
+    default: null,
+  },
+  forcePasswordChange: {
+    type: Boolean,
+    default: false,
+  },
+  activeSessionId: {
+    type: String,
+    default: null,
+  },
+  refreshTokenHash: {
+    type: String,
+    default: null,
+  },
+  refreshTokenExpiresAt: {
+    type: Date,
+    default: null,
+  },
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  twoFactorCodeHash: {
+    type: String,
+    default: null,
+  },
+  twoFactorCodeExpiresAt: {
+    type: Date,
+    default: null,
+  },
+  twoFactorPendingSessionId: {
+    type: String,
+    default: null,
+  },
+  twoFactorPendingDeviceFingerprint: {
+    type: String,
+    default: null,
+  },
+  knownDevices: [
+    {
+      fingerprint: { type: String, required: true },
+      deviceName: { type: String, default: "Unknown Device" },
+      ipAddress: { type: String, default: "" },
+      lastLoginAt: { type: Date, default: Date.now },
+    },
+  ],
+  // Per-user feature access override (featureKey => true/false)
+  featurePermissions: {
+    type: Map,
+    of: Boolean,
+    default: {},
+  },
+  // Department scope controls. If allowCrossDepartment is true, user can access all departments.
+  allowCrossDepartment: {
+    type: Boolean,
+    default: false,
+  },
+  allowedDepartments: {
+    type: [String],
+    default: [],
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -59,6 +151,18 @@ userSchema.pre("save", async function () {
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+userSchema.methods.getResetPasswordToken = function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  this.resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
+
+  return resetToken;
 };
 
 userSchema.methods.getLeaveSummary = async function () {
@@ -93,7 +197,7 @@ userSchema.statics.getDepartmentHeads = async function () {
 
 // Method to check if user can approve leaves
 userSchema.methods.canApproveLeaves = function () {
-  return ["manager", "admin"].includes(this.role);
+  return ["manager", "admin", "super_admin"].includes(this.role);
 };
 
 // Method to get direct reports (if manager)

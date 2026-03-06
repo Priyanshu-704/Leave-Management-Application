@@ -1,37 +1,60 @@
 import { FaTimes } from 'react-icons/fa';
+import { Button, Input, Select, Option } from "@/components/ui";
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
-const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId, departments }) => {
+const roleLabels = {
+  employee: "Employee",
+  manager: "Manager",
+  admin: "Admin",
+};
+
+const UserModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  formData,
+  setFormData,
+  editingId,
+  departments,
+  allowedRoles = ["employee", "manager"],
+}) => {
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     if (name.startsWith('leave.')) {
       const leaveType = name.split('.')[1];
       setFormData({
         ...formData,
         leaveBalance: {
           ...formData.leaveBalance,
-          [leaveType]: parseInt(value) || 0,
+          [leaveType]: value === '' ? '' : parseInt(value, 10),
         },
       });
     } else {
-      setFormData({ ...formData, [name]: value });
+      setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+    <div
+      className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative my-6 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">
             {editingId ? "Edit User" : "Add New User"}
           </h3>
-          <button
+          <Button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
             <FaTimes />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -40,7 +63,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Full Name *
               </label>
-              <input
+              <Input
                 type="text"
                 name="name"
                 value={formData.name}
@@ -54,7 +77,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email *
               </label>
-              <input
+              <Input
                 type="email"
                 name="email"
                 value={formData.email}
@@ -68,7 +91,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Employee ID *
               </label>
-              <input
+              <Input
                 type="text"
                 name="employeeId"
                 value={formData.employeeId}
@@ -82,37 +105,39 @@ const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Department *
               </label>
-              <select
+              <Select
                 name="department"
                 value={formData.department}
                 onChange={handleInputChange}
                 className="input-field"
                 required
               >
-                <option value="">Select Department</option>
+                <Option value="">Select Department</Option>
                 {departments.map((dept) => (
-                  <option key={dept._id} value={dept.name}>
+                  <Option key={dept._id} value={dept.name}>
                     {dept.name}
-                  </option>
+                  </Option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Role *
               </label>
-              <select
+              <Select
                 name="role"
                 value={formData.role}
                 onChange={handleInputChange}
                 className="input-field"
                 required
               >
-                <option value="employee">Employee</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
-              </select>
+                {allowedRoles.map((role) => (
+                  <Option key={role} value={role}>
+                    {roleLabels[role] || role}
+                  </Option>
+                ))}
+              </Select>
             </div>
 
             {!editingId && (
@@ -120,18 +145,33 @@ const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Password *
                 </label>
-                <input
+                <Input
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
                   className="input-field"
-                  required={!editingId}
                   minLength="6"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave blank to auto-generate a temporary password.
+                </p>
               </div>
             )}
           </div>
+
+          {!editingId && (
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <Input
+                type="checkbox"
+                name="sendCredentialsEmail"
+                checked={formData.sendCredentialsEmail}
+                onChange={handleInputChange}
+                className="h-4 w-4 rounded"
+              />
+              Send credentials to user by email
+            </label>
+          )}
 
           {/* Leave Balance */}
           <div className="border-t pt-4">
@@ -141,55 +181,58 @@ const UserModal = ({ isOpen, onClose, onSubmit, formData, setFormData, editingId
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Annual Leave
                 </label>
-                <input
+                <Input
                   type="number"
                   name="leave.annual"
                   value={formData.leaveBalance.annual}
                   onChange={handleInputChange}
                   className="input-field"
                   min="0"
+                  placeholder="Enter annual leave"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sick Leave
                 </label>
-                <input
+                <Input
                   type="number"
                   name="leave.sick"
                   value={formData.leaveBalance.sick}
                   onChange={handleInputChange}
                   className="input-field"
                   min="0"
+                  placeholder="Enter sick leave"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Personal Leave
                 </label>
-                <input
+                <Input
                   type="number"
                   name="leave.personal"
                   value={formData.leaveBalance.personal}
                   onChange={handleInputChange}
                   className="input-field"
                   min="0"
+                  placeholder="Enter personal leave"
                 />
               </div>
             </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
-            <button
+            <Button
               type="button"
               onClick={onClose}
               className="btn-secondary"
             >
               Cancel
-            </button>
-            <button type="submit" className="btn-primary">
+            </Button>
+            <Button type="submit" className="btn-primary">
               {editingId ? "Update User" : "Create User"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

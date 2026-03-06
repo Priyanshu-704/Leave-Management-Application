@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
+import { Button, Input, Select, Option } from "@/components/ui";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import { settingsService } from "@/services/api";
 import {
   FaBuilding,
   FaCalendarAlt,
@@ -27,8 +29,6 @@ import {
 } from "react-icons/fa";
 import toast from "react-hot-toast";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
 const Settings = () => {
   const { isAdmin } = useAuth();
   const { settings, loading, updateSettings, resetSection } = useSettings();
@@ -42,8 +42,8 @@ const Settings = () => {
 
   const fetchAuditLog = async () => {
     try {
-      const response = await axios.get(`${API_URL}/settings/audit`);
-      setAuditLog(response.data.data);
+      const response = await settingsService.getAuditLog();
+      setAuditLog(response.data);
     } catch (error) {
       console.error("Error fetching audit log:", error);
     }
@@ -51,8 +51,8 @@ const Settings = () => {
 
   const fetchSystemStatus = async () => {
     try {
-      const response = await axios.get(`${API_URL}/settings/status`);
-      setSystemStatus(response.data.data);
+      const response = await settingsService.getSystemStatus();
+      setSystemStatus(response.data);
     } catch (error) {
       console.error("Error fetching system status:", error);
     }
@@ -151,12 +151,10 @@ const Settings = () => {
 
   const testEmail = async () => {
     try {
-      await axios.post(`${API_URL}/settings/test-email`, {
-        testEmail: formData.company?.email,
-      });
+      await settingsService.testEmail(formData.company?.email);
       toast.success("Test email sent successfully");
     } catch (error) {
-      toast.error(error, "Failed to send test email");
+      toast.error(error.response?.data?.message || "Failed to send test email");
     }
   };
 
@@ -176,66 +174,68 @@ const Settings = () => {
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-1">Manage application configuration</p>
-        </div>
-        <div className="flex space-x-2">
-          {editing ? (
-            <>
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setFormData(settings);
-                }}
-                className="btn-secondary flex items-center space-x-2"
-              >
-                <FaTimes />
-                <span>Cancel</span>
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="btn-primary flex items-center space-x-2"
+      <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+            <p className="text-gray-600 mt-1">Manage application configuration</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {editing ? (
+              <>
+                <Button
+                  onClick={() => {
+                    setEditing(false);
+                    setFormData(settings);
+                  }}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  <FaTimes />
+                  <span>Cancel</span>
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  className="btn-primary inline-flex items-center gap-2 shadow-sm"
+                >
+                  <FaSave />
+                  <span>Save Changes</span>
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={() => setEditing(true)}
+                className="btn-primary inline-flex items-center gap-2 shadow-sm"
               >
                 <FaSave />
-                <span>Save Changes</span>
-              </button>
-            </>
-          ) : (
-            <button onClick={() => setEditing(true)} className="btn-primary">
-              Edit Settings
-            </button>
-          )}
+                <span>Edit Settings</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b overflow-x-auto">
-        <nav className="flex space-x-8 min-w-max">
+      <div className="rounded-2xl border border-gray-200 bg-white p-2 shadow-sm overflow-x-auto">
+        <nav className="flex gap-2 min-w-max">
           {tabs.map((tab) => (
-            <button
+            <Button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+              className={`px-3 py-2 rounded-lg border text-sm font-medium inline-flex items-center gap-2 transition-colors ${
                 activeTab === tab.id
-                  ? "border-primary-600 text-primary-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? "border-primary-200 bg-primary-50 text-primary-700"
+                  : "border-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
               <tab.icon />
               <span>{tab.name}</span>
-            </button>
+            </Button>
           ))}
         </nav>
       </div>
@@ -251,7 +251,7 @@ const Settings = () => {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="form-label">Company Name</label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.company?.name || ""}
                     onChange={(e) =>
@@ -263,7 +263,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Tax ID / VAT Number</label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.company?.taxId || ""}
                     onChange={(e) =>
@@ -287,7 +287,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Phone</label>
-                  <input
+                  <Input
                     type="tel"
                     value={formData.company?.phone || ""}
                     onChange={(e) =>
@@ -299,7 +299,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Email</label>
-                  <input
+                  <Input
                     type="email"
                     value={formData.company?.email || ""}
                     onChange={(e) =>
@@ -311,7 +311,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Website</label>
-                  <input
+                  <Input
                     type="url"
                     value={formData.company?.website || ""}
                     onChange={(e) =>
@@ -323,7 +323,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Registration Number</label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.company?.registrationNumber || ""}
                     onChange={(e) =>
@@ -346,13 +346,13 @@ const Settings = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Leave Configuration</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() => handleReset("leaveSettings")}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
                   Reset to Defaults
-                </button>
+                </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -360,9 +360,9 @@ const Settings = () => {
                   <label className="form-label">
                     Default Annual Leave Quota
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.leaveSettings?.defaultAnnualQuota || 20}
+                    value={formData.leaveSettings?.defaultAnnualQuota ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "leaveSettings",
@@ -377,9 +377,9 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Default Sick Leave Quota</label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.leaveSettings?.defaultSickQuota || 10}
+                    value={formData.leaveSettings?.defaultSickQuota ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "leaveSettings",
@@ -396,9 +396,9 @@ const Settings = () => {
                   <label className="form-label">
                     Default Personal Leave Quota
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.leaveSettings?.defaultPersonalQuota || 5}
+                    value={formData.leaveSettings?.defaultPersonalQuota ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "leaveSettings",
@@ -415,7 +415,7 @@ const Settings = () => {
                   <label className="form-label">
                     Max Consecutive Leave Days
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={
                       formData.leaveSettings?.maxConsecutiveLeaveDays || 30
@@ -436,9 +436,9 @@ const Settings = () => {
                   <label className="form-label">
                     Minimum Days Before Request
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.leaveSettings?.minDaysBeforeRequest || 1}
+                    value={formData.leaveSettings?.minDaysBeforeRequest ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "leaveSettings",
@@ -455,7 +455,7 @@ const Settings = () => {
                   <label className="form-label">
                     Leave Accrual Rate (days/month)
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.leaveSettings?.leaveAccrualRate || 1.5}
                     onChange={(e) =>
@@ -475,9 +475,9 @@ const Settings = () => {
                   <label className="form-label">
                     Probation Period (months)
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.leaveSettings?.probationPeriod || 6}
+                    value={formData.leaveSettings?.probationPeriod ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "leaveSettings",
@@ -494,7 +494,7 @@ const Settings = () => {
 
               <div className="space-y-3">
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={formData.leaveSettings?.allowHalfDay || false}
                     onChange={(e) =>
@@ -510,7 +510,7 @@ const Settings = () => {
                   <span>Allow Half-Day Leave</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.leaveSettings?.carryForwardLeaves || false
@@ -530,9 +530,9 @@ const Settings = () => {
                 {formData.leaveSettings?.carryForwardLeaves && (
                   <div className="ml-6">
                     <label className="form-label">Max Carry Forward Days</label>
-                    <input
+                    <Input
                       type="number"
-                      value={formData.leaveSettings?.maxCarryForwardDays || 5}
+                      value={formData.leaveSettings?.maxCarryForwardDays ?? ""}
                       onChange={(e) =>
                         handleInputChange(
                           "leaveSettings",
@@ -555,19 +555,19 @@ const Settings = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Attendance Settings</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() => handleReset("attendanceSettings")}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
                   Reset to Defaults
-                </button>
+                </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="form-label">Work Start Time</label>
-                  <input
+                  <Input
                     type="time"
                     value={
                       formData.attendanceSettings?.workStartTime || "09:00"
@@ -585,7 +585,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Work End Time</label>
-                  <input
+                  <Input
                     type="time"
                     value={formData.attendanceSettings?.workEndTime || "18:00"}
                     onChange={(e) =>
@@ -601,7 +601,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Grace Period (minutes)</label>
-                  <input
+                  <Input
                     type="number"
                     value={
                       formData.attendanceSettings?.gracePeriodMinutes || 15
@@ -622,9 +622,9 @@ const Settings = () => {
                   <label className="form-label">
                     Late Penalty After (minutes)
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.attendanceSettings?.latePenaltyAfter || 30}
+                    value={formData.attendanceSettings?.latePenaltyAfter ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "attendanceSettings",
@@ -641,9 +641,9 @@ const Settings = () => {
                   <label className="form-label">
                     Half Day Threshold (hours)
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.attendanceSettings?.halfDayThreshold || 4}
+                    value={formData.attendanceSettings?.halfDayThreshold ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "attendanceSettings",
@@ -672,7 +672,7 @@ const Settings = () => {
                     "sunday",
                   ].map((day) => (
                     <label key={day} className="flex items-center space-x-2">
-                      <input
+                      <Input
                         type="checkbox"
                         checked={
                           formData.attendanceSettings?.workWeekDays?.includes(
@@ -711,13 +711,13 @@ const Settings = () => {
                           </p>
                         </div>
                         {editing && (
-                          <button
+                          <Button
                             type="button"
                             onClick={() => handleRemoveHoliday(index)}
                             className="text-red-600 hover:text-red-800"
                           >
                             <FaTrash />
-                          </button>
+                          </Button>
                         )}
                       </div>
                     ),
@@ -725,7 +725,7 @@ const Settings = () => {
 
                   {editing && (
                     <div className="flex space-x-2 mt-3">
-                      <input
+                      <Input
                         type="text"
                         placeholder="Holiday name"
                         value={holidayInput.name}
@@ -737,7 +737,7 @@ const Settings = () => {
                         }
                         className="input-field flex-1"
                       />
-                      <input
+                      <Input
                         type="date"
                         value={holidayInput.date}
                         onChange={(e) =>
@@ -748,13 +748,13 @@ const Settings = () => {
                         }
                         className="input-field"
                       />
-                      <button
+                      <Button
                         type="button"
                         onClick={handleAddHoliday}
                         className="btn-primary"
                       >
                         <FaPlus />
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -763,7 +763,7 @@ const Settings = () => {
               <div className="space-y-3">
                 <h3 className="font-medium">Location Settings</h3>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.attendanceSettings?.requireLocation || false
@@ -784,7 +784,7 @@ const Settings = () => {
                 {formData.attendanceSettings?.requireLocation && (
                   <>
                     <label className="flex items-center space-x-2">
-                      <input
+                      <Input
                         type="checkbox"
                         checked={
                           formData.attendanceSettings?.allowGeoFencing || false
@@ -807,7 +807,7 @@ const Settings = () => {
                         <div>
                           <label className="form-label">Office Location</label>
                           <div className="flex space-x-2">
-                            <input
+                            <Input
                               type="number"
                               placeholder="Latitude"
                               value={
@@ -826,7 +826,7 @@ const Settings = () => {
                               className="input-field"
                               step="any"
                             />
-                            <input
+                            <Input
                               type="number"
                               placeholder="Longitude"
                               value={
@@ -851,7 +851,7 @@ const Settings = () => {
                           <label className="form-label">
                             Geo-fence Radius (meters)
                           </label>
-                          <input
+                          <Input
                             type="number"
                             value={
                               formData.attendanceSettings?.geoFenceRadius || 100
@@ -881,21 +881,21 @@ const Settings = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Security Settings</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() => handleReset("securitySettings")}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
                   Reset to Defaults
-                </button>
+                </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="form-label">Password Minimum Length</label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.securitySettings?.passwordMinLength || 6}
+                    value={formData.securitySettings?.passwordMinLength ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "securitySettings",
@@ -910,9 +910,9 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Password Expiry (days)</label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.securitySettings?.passwordExpiryDays || 90}
+                    value={formData.securitySettings?.passwordExpiryDays ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "securitySettings",
@@ -927,9 +927,9 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">Max Login Attempts</label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.securitySettings?.maxLoginAttempts || 5}
+                    value={formData.securitySettings?.maxLoginAttempts ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "securitySettings",
@@ -946,9 +946,9 @@ const Settings = () => {
                   <label className="form-label">
                     Session Timeout (minutes)
                   </label>
-                  <input
+                  <Input
                     type="number"
-                    value={formData.securitySettings?.sessionTimeout || 30}
+                    value={formData.securitySettings?.sessionTimeout ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "securitySettings",
@@ -966,7 +966,7 @@ const Settings = () => {
               <div className="space-y-3">
                 <h3 className="font-medium">Password Requirements</h3>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.securitySettings?.passwordRequireUppercase ||
@@ -985,7 +985,7 @@ const Settings = () => {
                   <span>Require Uppercase Letters</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.securitySettings?.passwordRequireLowercase ||
@@ -1004,7 +1004,7 @@ const Settings = () => {
                   <span>Require Lowercase Letters</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.securitySettings?.passwordRequireNumbers || false
@@ -1022,7 +1022,7 @@ const Settings = () => {
                   <span>Require Numbers</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.securitySettings?.passwordRequireSpecialChars ||
@@ -1045,7 +1045,7 @@ const Settings = () => {
               <div className="space-y-3">
                 <h3 className="font-medium">Additional Security</h3>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={formData.securitySettings?.twoFactorAuth || false}
                     onChange={(e) =>
@@ -1061,7 +1061,7 @@ const Settings = () => {
                   <span>Enable Two-Factor Authentication</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.securitySettings?.allowMultipleSessions || false
@@ -1088,27 +1088,27 @@ const Settings = () => {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Email Configuration</h2>
                 <div className="space-x-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={testEmail}
                     className="btn-secondary text-sm"
                   >
                     Test Email
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => handleReset("emailSettings")}
                     className="text-sm text-red-600 hover:text-red-800"
                   >
                     Reset to Defaults
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="form-label">SMTP Host</label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.emailSettings?.smtpHost || ""}
                     onChange={(e) =>
@@ -1124,7 +1124,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">SMTP Port</label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.emailSettings?.smtpPort || ""}
                     onChange={(e) =>
@@ -1140,7 +1140,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">SMTP User</label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.emailSettings?.smtpUser || ""}
                     onChange={(e) =>
@@ -1157,7 +1157,7 @@ const Settings = () => {
                 <div>
                   <label className="form-label">SMTP Password</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type={showPassword.smtp ? "text" : "password"}
                       value={formData.emailSettings?.smtpPassword || ""}
                       onChange={(e) =>
@@ -1170,7 +1170,7 @@ const Settings = () => {
                       disabled={!editing}
                       className="input-field pr-10"
                     />
-                    <button
+                    <Button
                       type="button"
                       onClick={() =>
                         setShowPassword({
@@ -1181,12 +1181,12 @@ const Settings = () => {
                       className="absolute right-3 top-3 text-gray-400"
                     >
                       {showPassword.smtp ? <FaEyeSlash /> : <FaEye />}
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <div>
                   <label className="form-label">From Email</label>
-                  <input
+                  <Input
                     type="email"
                     value={formData.emailSettings?.fromEmail || ""}
                     onChange={(e) =>
@@ -1202,7 +1202,7 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="form-label">From Name</label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.emailSettings?.fromName || ""}
                     onChange={(e) =>
@@ -1235,7 +1235,7 @@ const Settings = () => {
               </div>
 
               <label className="flex items-center space-x-2">
-                <input
+                <Input
                   type="checkbox"
                   checked={formData.emailSettings?.smtpSecure || false}
                   onChange={(e) =>
@@ -1258,20 +1258,41 @@ const Settings = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Theme Settings</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() => handleReset("themeSettings")}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
                   Reset to Defaults
-                </button>
+                </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
+                  <label className="form-label">Global Theme Mode</label>
+                  <Select
+                    value={formData.themeSettings?.colorScheme || "light"}
+                    onChange={(e) =>
+                      handleInputChange(
+                        "themeSettings",
+                        "colorScheme",
+                        e.target.value,
+                      )
+                    }
+                    disabled={!editing}
+                    className="input-field"
+                  >
+                    <Option value="light">Light Mode</Option>
+                    <Option value="dark">Dark Mode</Option>
+                  </Select>
+                </div>
+
+                <div />
+
+                <div>
                   <label className="form-label">Primary Color</label>
                   <div className="flex space-x-2">
-                    <input
+                    <Input
                       type="color"
                       value={formData.themeSettings?.primaryColor || "#2563eb"}
                       onChange={(e) =>
@@ -1284,7 +1305,7 @@ const Settings = () => {
                       disabled={!editing}
                       className="w-12 h-10 rounded border"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.themeSettings?.primaryColor || "#2563eb"}
                       onChange={(e) =>
@@ -1303,7 +1324,7 @@ const Settings = () => {
                 <div>
                   <label className="form-label">Secondary Color</label>
                   <div className="flex space-x-2">
-                    <input
+                    <Input
                       type="color"
                       value={
                         formData.themeSettings?.secondaryColor || "#4f46e5"
@@ -1318,7 +1339,7 @@ const Settings = () => {
                       disabled={!editing}
                       className="w-12 h-10 rounded border"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={
                         formData.themeSettings?.secondaryColor || "#4f46e5"
@@ -1341,7 +1362,7 @@ const Settings = () => {
               <div className="space-y-3">
                 <h3 className="font-medium">Logo Upload</h3>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <input
+                  <Input
                     type="file"
                     accept="image/*"
                     className="hidden"
@@ -1382,18 +1403,18 @@ const Settings = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Feature Toggles</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() => handleReset("featureToggles")}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
                   Reset to Defaults
-                </button>
+                </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.featureToggles?.enableLeaveModule || false
@@ -1417,7 +1438,7 @@ const Settings = () => {
                 </label>
 
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.featureToggles?.enableAttendanceModule || false
@@ -1441,7 +1462,7 @@ const Settings = () => {
                 </label>
 
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.featureToggles?.enableAnnouncements || false
@@ -1465,7 +1486,7 @@ const Settings = () => {
                 </label>
 
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.featureToggles?.enableFileManagement || false
@@ -1489,7 +1510,7 @@ const Settings = () => {
                 </label>
 
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={
                       formData.featureToggles?.enableDepartmentStructure ||
@@ -1514,7 +1535,7 @@ const Settings = () => {
                 </label>
 
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={formData.featureToggles?.enableReports || false}
                     onChange={(e) =>

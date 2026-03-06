@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
+import { Button, Input, Select, Option } from "@/components/ui";
+import PageSkeleton from "@/components/PageSkeleton";
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import { departmentService } from "@/services/api";
 import { 
   FaBuilding, 
   FaPlus, 
@@ -20,8 +22,9 @@ import {
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import ConfirmActionModal from '../components/modals/ConfirmActionModal';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 const Departments = () => {
   const {  isAdmin } = useAuth();
@@ -61,10 +64,18 @@ const Departments = () => {
     pages: 1,
     total: 0
   });
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+    name: ''
+  });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const debouncedSearch = useDebouncedValue(filters.search, 350);
+  useBodyScrollLock(showModal);
 
   useEffect(() => {
     fetchDepartments();
-  }, [filters, pagination.page]);
+  }, [debouncedSearch, filters.isActive, pagination.page]);
 
   const fetchDepartments = async () => {
     setLoading(true);
@@ -73,13 +84,15 @@ const Departments = () => {
         page: pagination.page,
         limit: 10,
         includeStats: 'true',
-        ...(filters.search && { search: filters.search }),
+        ...(debouncedSearch && { search: debouncedSearch }),
         ...(filters.isActive !== 'all' && { isActive: filters.isActive })
       });
 
-      const response = await axios.get(`${API_URL}/departments?${params}`);
-      setDepartments(response.data.data);
-      setPagination(response.data.pagination);
+      const response = await departmentService.getDepartments(
+        Object.fromEntries(params.entries()),
+      );
+      setDepartments(response.data);
+      setPagination(response.pagination);
     } catch (error) {
       console.error('Error fetching departments:', error);
       toast.error('Failed to fetch departments');
@@ -122,10 +135,10 @@ const Departments = () => {
     e.preventDefault();
     try {
       if (editingDept) {
-        await axios.put(`${API_URL}/departments/${editingDept._id}`, formData);
+        await departmentService.updateDepartment(editingDept._id, formData);
         toast.success('Department updated successfully');
       } else {
-        await axios.post(`${API_URL}/departments`, formData);
+        await departmentService.createDepartment(formData);
         toast.success('Department created successfully');
       }
       setShowModal(false);
@@ -136,15 +149,19 @@ const Departments = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this department?')) return;
-    
+  const handleDelete = async () => {
+    if (!deleteConfirm.id) return;
+
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API_URL}/departments/${id}`);
+      await departmentService.deleteDepartment(deleteConfirm.id);
       toast.success('Department deleted successfully');
       fetchDepartments();
+      setDeleteConfirm({ isOpen: false, id: null, name: '' });
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete department');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -177,12 +194,8 @@ const Departments = () => {
     setShowModal(true);
   };
 
-  if (loading && departments.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+  if (loading && departments.length === 0 && !filters.search.trim()) {
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -194,7 +207,7 @@ const Departments = () => {
           <p className="text-gray-600 mt-1">Manage organization departments and settings</p>
         </div>
         {isAdmin && (
-          <button
+          <Button
             onClick={() => {
               resetForm();
               setShowModal(true);
@@ -203,7 +216,7 @@ const Departments = () => {
           >
             <FaPlus />
             <span>Add Department</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -274,7 +287,7 @@ const Departments = () => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                 <FaSearch className="text-gray-400" />
               </div>
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -288,25 +301,25 @@ const Departments = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
             </label>
-            <select
+            <Select
               value={filters.isActive}
               onChange={(e) => setFilters({ ...filters, isActive: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Departments</option>
-              <option value="true">Active Only</option>
-              <option value="false">Inactive Only</option>
-            </select>
+              <Option value="all">All Departments</Option>
+              <Option value="true">Active Only</Option>
+              <Option value="false">Inactive Only</Option>
+            </Select>
           </div>
 
           <div className="flex items-end">
-            <button
+            <Button
               onClick={() => navigate('/departments/analytics')}
               className="btn-outline flex items-center space-x-2"
             >
               <FaChartBar />
               <span>View Analytics</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -402,20 +415,26 @@ const Departments = () => {
               
               {isAdmin && (
                 <div className="flex space-x-2">
-                  <button
+                  <Button
                     onClick={() => openEditModal(dept)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded"
                     title="Edit"
                   >
                     <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(dept._id)}
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      setDeleteConfirm({
+                        isOpen: true,
+                        id: dept._id,
+                        name: dept.name
+                      })
+                    }
                     className="p-2 text-red-600 hover:bg-red-50 rounded"
                     title="Delete"
                   >
                     <FaTrash />
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -426,35 +445,43 @@ const Departments = () => {
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex justify-center space-x-2">
-          <button
+          <Button
             onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
             disabled={pagination.page === 1}
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
             Previous
-          </button>
+          </Button>
           <span className="px-4 py-2">
             Page {pagination.page} of {pagination.pages}
           </span>
-          <button
+          <Button
             onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
             disabled={pagination.page === pagination.pages}
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Add/Edit Department Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+        <div
+          className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowModal(false);
+              resetForm();
+            }
+          }}
+        >
+          <div className="relative my-6 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">
                 {editingDept ? 'Edit Department' : 'Add New Department'}
               </h3>
-              <button
+              <Button
                 onClick={() => {
                   setShowModal(false);
                   resetForm();
@@ -462,7 +489,7 @@ const Departments = () => {
                 className="text-gray-400 hover:text-gray-600"
               >
                 <FaTimes />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -472,7 +499,7 @@ const Departments = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="form-label">Department Name *</label>
-                    <input
+                    <Input
                       type="text"
                       name="name"
                       value={formData.name}
@@ -483,7 +510,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Department Code *</label>
-                    <input
+                    <Input
                       type="text"
                       name="code"
                       value={formData.code}
@@ -514,7 +541,7 @@ const Departments = () => {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="form-label">Building</label>
-                    <input
+                    <Input
                       type="text"
                       name="location.building"
                       value={formData.location.building}
@@ -524,7 +551,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Floor</label>
-                    <input
+                    <Input
                       type="text"
                       name="location.floor"
                       value={formData.location.floor}
@@ -534,7 +561,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Office</label>
-                    <input
+                    <Input
                       type="text"
                       name="location.office"
                       value={formData.location.office}
@@ -551,7 +578,7 @@ const Departments = () => {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="form-label">Email</label>
-                    <input
+                    <Input
                       type="email"
                       name="contactInfo.email"
                       value={formData.contactInfo.email}
@@ -561,7 +588,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Phone</label>
-                    <input
+                    <Input
                       type="text"
                       name="contactInfo.phone"
                       value={formData.contactInfo.phone}
@@ -571,7 +598,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Extension</label>
-                    <input
+                    <Input
                       type="text"
                       name="contactInfo.extension"
                       value={formData.contactInfo.extension}
@@ -588,7 +615,7 @@ const Departments = () => {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="form-label">Annual Leave</label>
-                    <input
+                    <Input
                       type="number"
                       name="settings.defaultLeaveQuota.annual"
                       value={formData.settings.defaultLeaveQuota.annual}
@@ -599,7 +626,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Sick Leave</label>
-                    <input
+                    <Input
                       type="number"
                       name="settings.defaultLeaveQuota.sick"
                       value={formData.settings.defaultLeaveQuota.sick}
@@ -610,7 +637,7 @@ const Departments = () => {
                   </div>
                   <div>
                     <label className="form-label">Personal Leave</label>
-                    <input
+                    <Input
                       type="number"
                       name="settings.defaultLeaveQuota.personal"
                       value={formData.settings.defaultLeaveQuota.personal}
@@ -624,7 +651,7 @@ const Departments = () => {
 
               {/* Form Actions */}
               <div className="flex justify-end space-x-3">
-                <button
+                <Button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
@@ -633,18 +660,29 @@ const Departments = () => {
                   className="btn-secondary"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   className="btn-primary"
                 >
                   {editingDept ? 'Update Department' : 'Create Department'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      <ConfirmActionModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Department"
+        message={`Are you sure you want to delete "${deleteConfirm.name}"?`}
+        confirmText="Delete"
+        confirmClassName="bg-red-600 hover:bg-red-700"
+        loading={deleteLoading}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, name: '' })}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 };

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
 import { useAuth } from "../context/AuthContext";
 import {
   FaClock,
@@ -8,7 +9,7 @@ import {
 } from "react-icons/fa";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
-import instance from "../services/axios";
+import { leaveService } from "@/services/api";
 import AttendanceCard from "../components/AttendanceCard";
 import DashboardAnnouncementCard from "../components/DashboardAnnouncementCard";
 
@@ -19,30 +20,30 @@ const Dashboard = () => {
   const [pendingRequests, setPendingRequests] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const [summaryRes, leavesRes] = await Promise.all([
-        instance.get("/leaves/summary"),
-        instance.get("/leaves/my-leaves"),
+        leaveService.getSummary(),
+        leaveService.getMyLeaves(),
       ]);
 
-      setSummary(summaryRes.data);
-      setRecentLeaves(leavesRes.data.slice(0, 5));
+      setSummary(summaryRes);
+      setRecentLeaves(leavesRes.slice(0, 5));
 
       if (isManager) {
-        const pendingRes = await instance.get("/leaves?status=pending");
-        setPendingRequests(pendingRes.data.length);
+        const pendingRes = await leaveService.getLeaves({ status: "pending" });
+        setPendingRequests(pendingRes.length);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [isManager]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -58,11 +59,7 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   return (

@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { Button, Input } from "@/components/ui";
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import instance from '../services/axios';
+import { FaCalendarAlt, FaUserMd, FaUser, FaWallet, FaTimes } from "react-icons/fa";
+import { leaveService } from "@/services/api";
 
 const ApplyLeave = () => {
   const { user } = useAuth();
@@ -19,10 +21,10 @@ const ApplyLeave = () => {
   const [loading, setLoading] = useState(false);
 
   const leaveTypes = [
-    { value: 'annual', label: 'Annual Leave', icon: '🏖️' },
-    { value: 'sick', label: 'Sick Leave', icon: '🤒' },
-    { value: 'personal', label: 'Personal Leave', icon: '👤' },
-    { value: 'unpaid', label: 'Unpaid Leave', icon: '💰' }
+    { value: 'annual', label: 'Annual Leave', icon: <FaCalendarAlt /> },
+    { value: 'sick', label: 'Sick Leave', icon: <FaUserMd /> },
+    { value: 'personal', label: 'Personal Leave', icon: <FaUser /> },
+    { value: 'unpaid', label: 'Unpaid Leave', icon: <FaWallet /> }
   ];
 
   const calculateDays = () => {
@@ -47,7 +49,7 @@ const ApplyLeave = () => {
 
     setLoading(true);
     try {
-      await instance.post('/leaves', {
+      await leaveService.createLeave({
         ...formData,
         days
       });
@@ -61,8 +63,18 @@ const ApplyLeave = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="card">
+    <div className="fixed inset-0 z-40 bg-white/40 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="mx-auto w-full max-w-3xl rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+        <div className="mb-4 flex justify-end">
+          <Button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="btn-secondary !p-2"
+            aria-label="Close"
+          >
+            <FaTimes />
+          </Button>
+        </div>
         <h1 className="text-2xl font-bold mb-6">Apply for Leave</h1>
         
         {/* Leave Balance Summary */}
@@ -90,12 +102,12 @@ const ApplyLeave = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Leave Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Leave Type *
+            <label className="required-label block text-sm font-medium text-gray-700 mb-2">
+              Leave Type
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {leaveTypes.map((type) => (
-                <button
+                <Button
                   key={type.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, leaveType: type.value })}
@@ -105,9 +117,9 @@ const ApplyLeave = () => {
                       : 'border-gray-200 hover:border-primary-300'
                   }`}
                 >
-                  <span className="text-2xl mb-1 block">{type.icon}</span>
+                  <span className="text-2xl mb-1 block flex items-center justify-center">{type.icon}</span>
                   <span className="text-sm">{type.label}</span>
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -115,8 +127,8 @@ const ApplyLeave = () => {
           {/* Date Range */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date *
+              <label className="required-label block text-sm font-medium text-gray-700 mb-2">
+                Start Date
               </label>
               <DatePicker
                 selected={formData.startDate}
@@ -127,8 +139,8 @@ const ApplyLeave = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date *
+              <label className="required-label block text-sm font-medium text-gray-700 mb-2">
+                End Date
               </label>
               <DatePicker
                 selected={formData.endDate}
@@ -149,8 +161,8 @@ const ApplyLeave = () => {
 
           {/* Reason */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Reason for Leave *
+            <label className="required-label block text-sm font-medium text-gray-700 mb-2">
+              Reason for Leave
             </label>
             <textarea
               rows="4"
@@ -164,7 +176,7 @@ const ApplyLeave = () => {
 
           {/* Half Day Option */}
           <div className="flex items-center">
-            <input
+            <Input
               type="checkbox"
               id="halfDay"
               checked={formData.halfDay}
@@ -178,20 +190,20 @@ const ApplyLeave = () => {
 
           {/* Submit Button */}
           <div className="flex justify-end space-x-3">
-            <button
+            <Button
               type="button"
               onClick={() => navigate(-1)}
               className="btn-secondary"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={loading}
               className="btn-primary disabled:opacity-50"
             >
               {loading ? 'Submitting...' : 'Submit Application'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

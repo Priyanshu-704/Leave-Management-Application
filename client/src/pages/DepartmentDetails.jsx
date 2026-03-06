@@ -1,8 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
+import { Button } from "@/components/ui";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import axios from "axios";
+import { departmentService, userService } from "@/services/api";
 import {
   FaBuilding,
   FaEdit,
@@ -21,8 +23,6 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import DepartmentHeadModal from "../components/modals/DepartmentHeadModal";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
 const DepartmentDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,8 +39,8 @@ const DepartmentDetails = () => {
 
   const fetchDepartmentDetails = async () => {
     try {
-      const response = await axios.get(`${API_URL}/departments/${id}`);
-      setDepartment(response.data.data);
+      const response = await departmentService.getDepartment(id);
+      setDepartment(response.data);
     } catch (error) {
       console.error("Error fetching department:", error);
       toast.error("Failed to fetch department details");
@@ -60,11 +60,11 @@ const DepartmentDetails = () => {
     try {
       console.log("Fetching users for department:", department.name);
 
-      const encodedDeptName = encodeURIComponent(department.name);
       const excludeUserId = department.headOfDepartment?._id || "";
 
-      const response = await axios.get(
-        `${API_URL}/users/department/${encodedDeptName}/candidates${excludeUserId ? `?excludeUserId=${excludeUserId}` : ""}`,
+      const response = await userService.getDepartmentCandidates(
+        department.name,
+        excludeUserId || undefined,
       );
 
       console.log("Candidates response:", response.data);
@@ -74,9 +74,7 @@ const DepartmentDetails = () => {
       setShowHeadModal(true);
 
       if (response.data.count === 0) {
-        toast("No eligible users found in this department", {
-          icon: "ℹ️",
-        });
+        toast("No eligible users found in this department");
       }
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -90,7 +88,7 @@ const DepartmentDetails = () => {
   
   const setDepartmentHead = async (userId) => {
     try {
-      await axios.put(`${API_URL}/departments/${id}/head`, { userId });
+      await departmentService.setDepartmentHead(id, userId);
       toast.success("Department head updated successfully");
       setShowHeadModal(false);
       fetchDepartmentDetails(); // Refresh department data
@@ -103,11 +101,7 @@ const DepartmentDetails = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   if (!department) {
@@ -126,12 +120,12 @@ const DepartmentDetails = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button
+          <Button
             onClick={() => navigate("/departments")}
             className="p-2 hover:bg-gray-100 rounded-lg"
           >
             <FaArrowLeft className="text-gray-600" />
-          </button>
+          </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {department.name}
@@ -140,13 +134,13 @@ const DepartmentDetails = () => {
           </div>
         </div>
         {isAdmin && (
-          <button
+          <Button
             onClick={() => navigate(`/departments/edit/${id}`)}
             className="btn-primary flex items-center space-x-2"
           >
             <FaEdit />
             <span>Edit Department</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -166,7 +160,7 @@ const DepartmentDetails = () => {
           </div>
           <span
             className={`px-3 py-1 rounded-full text-sm ${
-              department.isActive ? "bg-green-500" : "bg-gray-500"
+              department.isActive ? "bg-green-500" : "bg-gray-50"
             }`}
           >
             {department.isActive ? "Active" : "Inactive"}
@@ -206,7 +200,7 @@ const DepartmentDetails = () => {
       {/* Tabs */}
       <div className="border-b">
         <nav className="flex space-x-8">
-          <button
+          <Button
             onClick={() => setActiveTab("overview")}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === "overview"
@@ -215,8 +209,8 @@ const DepartmentDetails = () => {
             }`}
           >
             Overview
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab("employees")}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === "employees"
@@ -225,8 +219,8 @@ const DepartmentDetails = () => {
             }`}
           >
             Employees
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab("leaves")}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === "leaves"
@@ -235,9 +229,9 @@ const DepartmentDetails = () => {
             }`}
           >
             Leave Statistics
-          </button>
+          </Button>
           {(isAdmin || isManager) && (
-            <button
+            <Button
               onClick={() => setActiveTab("pending")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === "pending"
@@ -246,7 +240,7 @@ const DepartmentDetails = () => {
               }`}
             >
               Pending Approvals
-            </button>
+            </Button>
           )}
         </nav>
       </div>
@@ -332,12 +326,12 @@ const DepartmentDetails = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold">Department Head</h3>
                   {isAdmin && (
-                    <button
+                    <Button
                       onClick={fetchAvailableUsers}
                       className="text-sm text-primary-600 hover:underline"
                     >
                       Change
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {department.headOfDepartment ? (

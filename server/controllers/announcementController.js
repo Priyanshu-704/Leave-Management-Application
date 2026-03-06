@@ -1,6 +1,7 @@
 const Announcement = require('../models/Announcement');
-const User = require('../models/User');
-const Department = require('../models/Department');
+
+const isSuperAdmin = (user) => user?.role === 'super_admin';
+const isDepartmentScopedUser = (user) => ['admin', 'manager'].includes(user?.role);
 
 // @desc    Create announcement
 // @route   POST /api/announcements
@@ -20,24 +21,27 @@ exports.createAnnouncement = async (req, res) => {
     } = req.body;
 
     // Validate permissions
-    if (req.user.role === 'manager' && targetRoles?.includes('admin')) {
+    if (
+      req.user.role === 'manager' &&
+      targetRoles?.some((role) => ['admin', 'super_admin'].includes(role))
+    ) {
       return res.status(403).json({
         message: 'Managers cannot target admin role'
       });
     }
 
-    // For managers, restrict to their department
+    // Restrict non-super admin/manager users to their own department
     let finalTargetDepartments = targetDepartments;
-    if (req.user.role === 'manager') {
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
       if (!targetDepartments || targetDepartments.length === 0) {
-        // If no departments specified, default to manager's department
+        // If no departments specified, default to user's department
         finalTargetDepartments = [req.user.department];
       } else {
-        // Verify manager only targets their own department
+        // Verify users only target their own department
         const invalidDepts = targetDepartments.filter(d => d !== req.user.department);
         if (invalidDepts.length > 0) {
           return res.status(403).json({
-            message: 'Managers can only post to their own department'
+            message: 'You can only post to your own department'
           });
         }
       }
@@ -113,8 +117,15 @@ exports.getAnnouncements = async (req, res) => {
     }
 
     // Role-based filtering
-    if (req.user.role === 'admin') {
-      // Admin sees everything
+    if (isSuperAdmin(req.user)) {
+      // Super admin sees everything
+    } else if (req.user.role === 'admin') {
+      // Department admins see department/global announcements + their own
+      query.$or = [
+        { targetRoles: { $in: ['all', 'admin'] } },
+        { targetDepartments: req.user.department },
+        { createdBy: req.user.id }
+      ];
     } else if (req.user.role === 'manager') {
       // Managers see:
       // - Global announcements (targetRoles includes 'all' or 'manager')
@@ -137,6 +148,9 @@ exports.getAnnouncements = async (req, res) => {
 
     // Department filter (for managers/admins)
     if (department && department !== 'all' && req.user.role !== 'employee') {
+      if (!isSuperAdmin(req.user) && department !== req.user.department) {
+        return res.status(403).json({ message: 'Not authorized' });
+      }
       query.targetDepartments = department;
     }
 
@@ -145,6 +159,8 @@ exports.getAnnouncements = async (req, res) => {
     const announcements = await Announcement.find(query)
       .populate('createdBy', 'name email role department')
       .populate('readBy.user', 'name email')
+      .populate('acknowledgedBy.user', 'name email')
+      .populate('comments.user', 'name email')
       .sort({ pinned: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -226,8 +242,20 @@ exports.updateAnnouncement = async (req, res) => {
     }
 
     // Check permission
-    if (req.user.role !== 'admin' && announcement.createdBy.toString() !== req.user.id) {
+    if (
+      !isSuperAdmin(req.user) &&
+      announcement.createdBy.toString() !== req.user.id
+    ) {
       return res.status(403).json({ message: 'Not authorized to update this announcement' });
+    }
+
+    if (
+      isDepartmentScopedUser(req.user) &&
+      !isSuperAdmin(req.user) &&
+      announcement.targetDepartments?.length > 0 &&
+      !announcement.targetDepartments.includes(req.user.department)
+    ) {
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Update fields
@@ -269,8 +297,20 @@ exports.deleteAnnouncement = async (req, res) => {
     }
 
     // Check permission
-    if (req.user.role !== 'admin' && announcement.createdBy.toString() !== req.user.id) {
+    if (
+      !isSuperAdmin(req.user) &&
+      announcement.createdBy.toString() !== req.user.id
+    ) {
       return res.status(403).json({ message: 'Not authorized to delete this announcement' });
+    }
+
+    if (
+      isDepartmentScopedUser(req.user) &&
+      !isSuperAdmin(req.user) &&
+      announcement.targetDepartments?.length > 0 &&
+      !announcement.targetDepartments.includes(req.user.department)
+    ) {
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Soft delete
@@ -297,6 +337,14 @@ exports.acknowledgeAnnouncement = async (req, res) => {
 
     if (!announcement) {
       return res.status(404).json({ message: 'Announcement not found' });
+    }
+
+    if (!announcement.isActive) {
+      return res.status(400).json({ message: 'Announcement is no longer active' });
+    }
+
+    if (!announcement.canUserView(req.user)) {
+      return res.status(403).json({ message: 'Not authorized to acknowledge this announcement' });
     }
 
     // Check if already acknowledged
@@ -335,9 +383,21 @@ exports.addComment = async (req, res) => {
       return res.status(404).json({ message: 'Announcement not found' });
     }
 
+    if (!announcement.isActive) {
+      return res.status(400).json({ message: 'Announcement is no longer active' });
+    }
+
+    if (!announcement.canUserView(req.user)) {
+      return res.status(403).json({ message: 'Not authorized to comment on this announcement' });
+    }
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: 'Comment content is required' });
+    }
+
     announcement.comments.push({
       user: req.user.id,
-      content,
+      content: content.trim(),
       createdAt: new Date()
     });
 
@@ -359,7 +419,20 @@ exports.addComment = async (req, res) => {
 // @access  Private/Admin
 exports.getAnnouncementStats = async (req, res) => {
   try {
-    const stats = await Announcement.aggregate([
+    const pipeline = [];
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { targetDepartments: req.user.department },
+            { createdBy: req.user._id }
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
       {
         $group: {
           _id: null,
@@ -412,10 +485,22 @@ exports.getAnnouncementStats = async (req, res) => {
           avgReadsPerAnnouncement: { $divide: ['$totalReads', '$total'] }
         }
       }
-    ]);
+    );
+
+    const stats = await Announcement.aggregate(pipeline);
 
     // Get recent activity
-    const recent = await Announcement.find()
+    const recentQuery =
+      isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)
+        ? {
+            $or: [
+              { targetDepartments: req.user.department },
+              { createdBy: req.user.id }
+            ]
+          }
+        : {};
+
+    const recent = await Announcement.find(recentQuery)
       .sort('-createdAt')
       .limit(5)
       .select('title createdAt readBy acknowledgedBy');

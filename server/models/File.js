@@ -102,7 +102,7 @@ const fileSchema = new mongoose.Schema({
   },
   uploadedByRole: {
     type: String,
-    enum: ['admin', 'manager', 'employee']
+    enum: ['super_admin', 'admin', 'manager', 'employee']
   },
   department: String, // Department context (for manager uploads)
 
@@ -177,8 +177,8 @@ fileSchema.index({ department: 1 });
 
 // Method to check if user can access file
 fileSchema.methods.canUserAccess = function(user) {
-  // Admin can access everything
-  if (user.role === 'admin') return true;
+  // Super admin can access everything
+  if (user.role === 'super_admin') return true;
   
   // Public files
   if (this.accessControl.type === 'public') return true;
@@ -188,8 +188,14 @@ fileSchema.methods.canUserAccess = function(user) {
     return false;
   }
   
+  const isScopedRole = ['admin', 'manager'].includes(user.role);
+  const isDepartmentMismatch =
+    isScopedRole && this.department && this.department !== user.department;
+
   // Check allowed roles
-  if (this.accessControl.allowedRoles?.includes(user.role)) return true;
+  if (this.accessControl.allowedRoles?.includes(user.role)) {
+    if (!isDepartmentMismatch) return true;
+  }
   
   // Check allowed departments
   if (this.accessControl.allowedDepartments?.includes(user.department)) return true;
@@ -201,7 +207,7 @@ fileSchema.methods.canUserAccess = function(user) {
   if (this.uploadedBy.toString() === user._id.toString()) return true;
   
   // Manager can access files from their department
-  if (user.role === 'manager' && this.department === user.department) return true;
+  if (isScopedRole && this.department === user.department) return true;
   
   return false;
 };

@@ -1,12 +1,25 @@
 const Department = require("../models/Department");
 const User = require("../models/User");
 const Leave = require("../models/Leave");
+const {
+  isSuperAdmin,
+  isAdmin,
+  canAccessDepartment,
+} = require("../utils/accessControl");
+
+const isDepartmentScopedUser = (user) => ["manager"].includes(user?.role);
 
 // @desc    Create a new department
 // @route   POST /api/departments
 // @access  Private/Admin
 exports.createDepartment = async (req, res) => {
   try {
+    if (!isSuperAdmin(req.user) && !isAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only admin or super admin can create departments",
+      });
+    }
+
     const { name, code, description, location, contactInfo, settings } =
       req.body;
 
@@ -67,6 +80,10 @@ exports.getDepartments = async (req, res) => {
         { code: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
       ];
+    }
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      query.name = req.user.department;
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -149,6 +166,14 @@ exports.getDepartmentById = async (req, res) => {
       return res.status(404).json({ message: "Department not found" });
     }
 
+    if (
+      isDepartmentScopedUser(req.user) &&
+      !isSuperAdmin(req.user) &&
+      !canAccessDepartment(req.user, department.name)
+    ) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     // Get employees in this department
     const employees = await User.find({
       department: department.name,
@@ -182,7 +207,7 @@ exports.getDepartmentById = async (req, res) => {
 
     // Get pending approvals if user is manager/admin
     let pendingApprovals = [];
-    if (["manager", "admin"].includes(req.user.role)) {
+    if (["manager", "admin", "super_admin"].includes(req.user.role)) {
       pendingApprovals = await Leave.find({
         status: "pending",
         employee: { $in: employeeIds },
@@ -216,6 +241,12 @@ exports.getDepartmentById = async (req, res) => {
 // @access  Private/Admin
 exports.updateDepartment = async (req, res) => {
   try {
+    if (!isSuperAdmin(req.user) && !isAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only admin or super admin can update departments",
+      });
+    }
+
     const department = await Department.findById(req.params.id);
 
     if (!department) {
@@ -235,6 +266,8 @@ exports.updateDepartment = async (req, res) => {
         });
       }
     }
+
+    const previousDepartmentName = department.name;
 
     // Update fields
     const updatableFields = [
@@ -262,9 +295,9 @@ exports.updateDepartment = async (req, res) => {
     await department.save();
 
     // If department name changed, update all users in this department
-    if (req.body.name && req.body.name !== department.name) {
+    if (req.body.name && req.body.name !== previousDepartmentName) {
       await User.updateMany(
-        { department: department.name },
+        { department: previousDepartmentName },
         { department: req.body.name },
       );
     }
@@ -283,6 +316,12 @@ exports.updateDepartment = async (req, res) => {
 // @access  Private/Admin
 exports.deleteDepartment = async (req, res) => {
   try {
+    if (!isSuperAdmin(req.user) && !isAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only admin or super admin can delete departments",
+      });
+    }
+
     const department = await Department.findById(req.params.id);
 
     if (!department) {
@@ -321,6 +360,12 @@ exports.deleteDepartment = async (req, res) => {
 // @access  Private/Admin
 exports.setDepartmentHead = async (req, res) => {
   try {
+    if (!isSuperAdmin(req.user) && !isAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only admin or super admin can set department heads",
+      });
+    }
+
     const { userId } = req.body;
 
     const department = await Department.findById(req.params.id);
@@ -372,6 +417,65 @@ exports.setDepartmentHead = async (req, res) => {
 // @access  Private
 exports.getDepartmentHierarchy = async (req, res) => {
   try {
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      const currentDepartment = await Department.findOne({
+        name: req.user.department,
+        isActive: true,
+      }).populate("headOfDepartment", "name email");
+
+      if (!currentDepartment) {
+        return res.json({
+          success: true,
+          data: [],
+        });
+      }
+
+      const buildChildren = async (parentId) => {
+        const departments = await Department.find({
+          parentDepartment: parentId,
+          isActive: true,
+        }).populate("headOfDepartment", "name email");
+
+        return Promise.all(
+          departments.map(async (dept) => {
+            const children = await buildChildren(dept._id);
+            const employeeCount = await User.countDocuments({
+              department: dept.name,
+              isActive: true,
+            });
+            return {
+              _id: dept._id,
+              name: dept.name,
+              code: dept.code,
+              headOfDepartment: dept.headOfDepartment,
+              employeeCount,
+              children,
+            };
+          }),
+        );
+      };
+
+      const employeeCount = await User.countDocuments({
+        department: currentDepartment.name,
+        isActive: true,
+      });
+      const children = await buildChildren(currentDepartment._id);
+
+      return res.json({
+        success: true,
+        data: [
+          {
+            _id: currentDepartment._id,
+            name: currentDepartment.name,
+            code: currentDepartment.code,
+            headOfDepartment: currentDepartment.headOfDepartment,
+            employeeCount,
+            children,
+          },
+        ],
+      });
+    }
+
     const buildHierarchy = async (parentId = null) => {
       const departments = await Department.find({
         parentDepartment: parentId,
@@ -419,6 +523,14 @@ exports.getDepartmentLeaveSummary = async (req, res) => {
     const department = await Department.findById(req.params.id);
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
+    }
+
+    if (
+      isDepartmentScopedUser(req.user) &&
+      !isSuperAdmin(req.user) &&
+      !canAccessDepartment(req.user, department.name)
+    ) {
+      return res.status(403).json({ message: "Not authorized" });
     }
 
     // Get all employees in department
@@ -507,6 +619,12 @@ exports.getDepartmentLeaveSummary = async (req, res) => {
 // @access  Private/Admin
 exports.bulkImportDepartments = async (req, res) => {
   try {
+    if (!isSuperAdmin(req.user) && !isAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only admin or super admin can import departments",
+      });
+    }
+
     const { departments } = req.body;
 
     const results = {
@@ -568,7 +686,15 @@ exports.bulkImportDepartments = async (req, res) => {
 // @access  Private/Admin
 exports.getDepartmentAnalytics = async (req, res) => {
   try {
-    const analytics = await Department.aggregate([
+    const analyticsPipeline = [];
+
+    if (isDepartmentScopedUser(req.user) && !isSuperAdmin(req.user)) {
+      analyticsPipeline.push({
+        $match: { name: req.user.department },
+      });
+    }
+
+    analyticsPipeline.push(
       {
         $lookup: {
           from: "users",
@@ -658,7 +784,9 @@ exports.getDepartmentAnalytics = async (req, res) => {
       {
         $sort: { name: 1 },
       },
-    ]);
+    );
+
+    const analytics = await Department.aggregate(analyticsPipeline);
 
     res.json({
       success: true,

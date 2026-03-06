@@ -41,6 +41,18 @@ const leaveSchema = new mongoose.Schema({
     ref: 'User'
   },
   approvedOn: Date,
+  autoApproved: {
+    type: Boolean,
+    default: false,
+  },
+  isBalanceDeducted: {
+    type: Boolean,
+    default: false,
+  },
+  deductedDays: {
+    type: Number,
+    default: 0,
+  },
   comments: String,
   documents: [{
     filename: String,

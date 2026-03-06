@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button, Input } from "@/components/ui";
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   FaBullhorn,
@@ -11,11 +12,14 @@ import {
   FaUserCircle,
   FaThumbtack,
   FaBell,
-  FaEye
+  FaEye,
+  FaEdit,
+  FaTrash,
+  FaBuilding,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
-const AnnouncementCard = ({ announcement, onAcknowledge, onComment }) => {
+const AnnouncementCard = ({ announcement, onAcknowledge, onComment, onEdit, onDelete }) => {
   const { user } = useAuth();
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -40,16 +44,23 @@ const AnnouncementCard = ({ announcement, onAcknowledge, onComment }) => {
 
   const getTypeIcon = (type) => {
     switch(type) {
-      case 'urgent': return '🚨';
-      case 'event': return '📅';
-      case 'holiday': return '🎉';
-      case 'department': return '🏢';
-      default: return '📢';
+      case 'urgent': return <FaExclamationTriangle className="text-red-600" />;
+      case 'event': return <FaCalendarAlt className="text-blue-600" />;
+      case 'holiday': return <FaBell className="text-green-600" />;
+      case 'department': return <FaBuilding className="text-purple-600" />;
+      default: return <FaBullhorn className="text-primary-600" />;
     }
   };
 
-  const isRead = announcement.readBy?.some(r => r.user?._id === user?._id);
-  const isAcknowledged = announcement.acknowledgedBy?.some(a => a.user?._id === user?._id);
+  const isRead = announcement.readBy?.some(
+    r => (r.user?._id || r.user)?.toString() === user?._id?.toString()
+  );
+  const isAcknowledged = announcement.acknowledgedBy?.some(
+    a => (a.user?._id || a.user)?.toString() === user?._id?.toString()
+  );
+  const canManage =
+    ['admin', 'super_admin'].includes(user?.role) ||
+    announcement.createdBy?._id === user?._id;
 
   const handleAcknowledge = () => {
     onAcknowledge(announcement._id);
@@ -167,23 +178,41 @@ const AnnouncementCard = ({ announcement, onAcknowledge, onComment }) => {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center space-x-3 border-t pt-3">
-        {!isAcknowledged && announcement.type === 'urgent' && (
-          <button
+      <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+        {!isAcknowledged && (
+          <Button
             onClick={handleAcknowledge}
-            className="flex items-center space-x-1 text-green-600 hover:text-green-700 text-sm"
+            className="inline-flex items-center gap-1.5 text-green-700 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-md text-sm"
           >
             <FaCheckCircle />
             <span>Acknowledge</span>
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           onClick={() => setShowComments(!showComments)}
-          className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 text-sm"
+          className="inline-flex items-center gap-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm"
         >
           <FaComment />
           <span>{showComments ? 'Hide Comments' : 'Show Comments'}</span>
-        </button>
+        </Button>
+        {canManage && (
+          <Button
+            onClick={() => onEdit?.(announcement)}
+            className="inline-flex items-center gap-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md text-sm"
+          >
+            <FaEdit />
+            <span>Edit</span>
+          </Button>
+        )}
+        {canManage && (
+          <Button
+            onClick={() => onDelete?.(announcement)}
+            className="inline-flex items-center gap-1.5 text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md text-sm"
+          >
+            <FaTrash />
+            <span>Delete</span>
+          </Button>
+        )}
       </div>
 
       {/* Comments Section */}
@@ -209,7 +238,7 @@ const AnnouncementCard = ({ announcement, onAcknowledge, onComment }) => {
 
           {/* Add Comment */}
           <div className="flex space-x-2">
-            <input
+            <Input
               type="text"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
@@ -217,13 +246,13 @@ const AnnouncementCard = ({ announcement, onAcknowledge, onComment }) => {
               className="input-field text-sm flex-1"
               onKeyPress={(e) => e.key === 'Enter' && handleComment()}
             />
-            <button
+            <Button
               onClick={handleComment}
               disabled={!commentText.trim()}
               className="btn-primary px-4 py-2 text-sm disabled:opacity-50"
             >
               Post
-            </button>
+            </Button>
           </div>
         </div>
       )}

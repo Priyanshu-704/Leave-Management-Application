@@ -1,5 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
+import { Button, Input, Select, Option, MultiSelect } from "@/components/ui";
+import PageSkeleton from "@/components/PageSkeleton";
 import {
   FaUserPlus,
   FaEdit,
@@ -12,14 +14,21 @@ import {
   FaKey,
   FaBan,
   FaCheckCircle,
+  FaEnvelope,
+  FaShieldAlt,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
-import instance from "../services/axios";
+import { departmentService, userService } from "@/services/api";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 import UserModal from "../components/modals/UserModal";
 import LeaveBalanceModal from "../components/modals/LeaveBalanceModal";
 import DeleteConfirmModal from "../components/modals/DeleteConfirmModal";
+import { FEATURE_ACCESS } from "@/config/featureAccess";
+import { useAuth } from "@/context/AuthContext";
+import { getCreatableRoles } from "@/lib/accessControl";
 
 const Users = () => {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -32,7 +41,13 @@ const Users = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showLeaveBalanceModal, setShowLeaveBalanceModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [permissionsDraft, setPermissionsDraft] = useState({
+    featurePermissions: {},
+    allowCrossDepartment: false,
+    allowedDepartments: [],
+  });
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -45,13 +60,23 @@ const Users = () => {
       sick: 10,
       personal: 5,
     },
+    sendCredentialsEmail: true,
   });
   const [editingId, setEditingId] = useState(null);
+  const debouncedSearch = useDebouncedValue(filters.search, 350);
+  const creatableRoles = getCreatableRoles(user);
+  const visibleFilterRoles =
+    user?.role === "super_admin" ? ["employee", "manager", "admin"] : ["employee", "manager"];
+
+  const getSafeRole = (role) => {
+    if (creatableRoles.includes(role)) return role;
+    return creatableRoles[0] || "employee";
+  };
 
   useEffect(() => {
     fetchUsers();
     fetchDepartments();
-  }, [filters]);
+  }, [filters.role, filters.department, filters.status, debouncedSearch]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -62,10 +87,10 @@ const Users = () => {
         params.append("department", filters.department);
       if (filters.status !== "all")
         params.append("isActive", filters.status === "active");
-      if (filters.search) params.append("search", filters.search);
+      if (debouncedSearch) params.append("search", debouncedSearch);
 
-      const response = await instance.get(`/users?${params.toString()}`);
-      setUsers(response.data.users || response.data);
+      const response = await userService.getUsers(Object.fromEntries(params.entries()));
+      setUsers(response.users || response);
     } catch (error) {
       toast.error("Failed to fetch users");
       console.error(error);
@@ -76,9 +101,9 @@ const Users = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await instance.get("/departments");
+      const response = await departmentService.getDepartments();
       // Handle different response structures
-      const departmentsData = response.data.data || response.data || [];
+      const departmentsData = response.data || response || [];
       setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
     } catch (error) {
       console.error("Failed to fetch departments:", error);
@@ -89,12 +114,30 @@ const Users = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const safeRole = getSafeRole(formData.role);
+      if (!safeRole) {
+        toast.error("You are not allowed to create users");
+        return;
+      }
+
+      const payload = {
+        ...formData,
+        role: safeRole,
+      };
+
       if (editingId) {
-        await instance.put(`/users/${editingId}`, formData);
+        await userService.updateUser(editingId, payload);
         toast.success("User updated successfully");
       } else {
-        await instance.post("/users", formData);
-        toast.success("User created successfully");
+        const response = await userService.createUser(payload);
+        if (response?.warning) {
+          toast.success("User created");
+          toast.error(response.warning);
+        } else if (response?.credentialsSent) {
+          toast.success("User created and credentials sent");
+        } else {
+          toast.success("User created successfully");
+        }
       }
       setShowUserModal(false);
       resetForm();
@@ -106,7 +149,7 @@ const Users = () => {
 
   const handleDelete = async () => {
     try {
-      await instance.delete(`/users/${selectedUser._id}`);
+      await userService.deleteUser(selectedUser._id);
       toast.success("User deleted successfully");
       setShowDeleteModal(false);
       setSelectedUser(null);
@@ -119,10 +162,7 @@ const Users = () => {
   const handleUpdateLeaveBalance = async (e) => {
     e.preventDefault();
     try {
-      await instance.put(
-        `/users/${selectedUser._id}/leave-balance`,
-        formData.leaveBalance,
-      );
+      await userService.updateLeaveBalance(selectedUser._id, formData.leaveBalance);
       toast.success("Leave balance updated successfully");
       setShowLeaveBalanceModal(false);
       setSelectedUser(null);
@@ -135,7 +175,7 @@ const Users = () => {
 
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
-      await instance.put(`/users/${userId}/toggle-status`);
+      await userService.toggleUserStatus(userId);
       toast.success(
         `User ${currentStatus ? "deactivated" : "activated"} successfully`,
       );
@@ -154,12 +194,13 @@ const Users = () => {
       password: "",
       employeeId: "",
       department: "",
-      role: "employee",
+      role: getSafeRole("employee"),
       leaveBalance: {
         annual: 20,
         sick: 10,
         personal: 5,
       },
+      sendCredentialsEmail: true,
     });
     setEditingId(null);
     setSelectedUser(null);
@@ -173,14 +214,58 @@ const Users = () => {
       password: "",
       employeeId: user.employeeId,
       department: user.department,
-      role: user.role,
+      role: getSafeRole(user.role),
       leaveBalance: user.leaveBalance || {
         annual: 20,
         sick: 10,
         personal: 5,
       },
+      sendCredentialsEmail: true,
     });
     setShowUserModal(true);
+  };
+
+  const sendCredentials = async (userId) => {
+    try {
+      const response = await userService.sendCredentials(userId);
+      toast.success(response?.message || "Credentials sent successfully");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to send credentials");
+    }
+  };
+
+  const openPermissionsModal = (user) => {
+    setSelectedUser(user);
+    setPermissionsDraft({
+      featurePermissions: user.featurePermissions || {},
+      allowCrossDepartment: !!user.allowCrossDepartment,
+      allowedDepartments: user.allowedDepartments || [],
+    });
+    setShowPermissionsModal(true);
+  };
+
+  const handlePermissionToggle = (featureKey) => {
+    setPermissionsDraft((prev) => {
+      const next = { ...(prev.featurePermissions || {}) };
+      const current = next[featureKey];
+      if (current === true) next[featureKey] = false;
+      else if (current === false) delete next[featureKey];
+      else next[featureKey] = true;
+      return { ...prev, featurePermissions: next };
+    });
+  };
+
+  const savePermissions = async () => {
+    if (!selectedUser?._id) return;
+    try {
+      await userService.updateUserPermissions(selectedUser._id, permissionsDraft);
+      toast.success("Permissions updated");
+      setShowPermissionsModal(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update permissions");
+    }
   };
 
   const openLeaveBalanceModal = (user) => {
@@ -207,12 +292,8 @@ const Users = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+  if (loading && users.length === 0 && !filters.search.trim()) {
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -220,7 +301,7 @@ const Users = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-        <button
+        <Button
           onClick={() => {
             resetForm();
             setShowUserModal(true);
@@ -229,7 +310,7 @@ const Users = () => {
         >
           <FaUserPlus />
           <span>Add New User</span>
-        </button>
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -293,53 +374,55 @@ const Users = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Role
             </label>
-            <select
+            <Select
               value={filters.role}
               onChange={(e) => setFilters({ ...filters, role: e.target.value })}
               className="input-field"
             >
-              <option value="all">All Roles</option>
-              <option value="employee">Employee</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
-            </select>
+              <Option value="all">All Roles</Option>
+              {visibleFilterRoles.map((role) => (
+                <Option key={role} value={role}>
+                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                </Option>
+              ))}
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Department
             </label>
-            <select
+            <Select
               value={filters.department}
               onChange={(e) =>
                 setFilters({ ...filters, department: e.target.value })
               }
               className="input-field"
             >
-              <option value="all">All Departments</option>
+              <Option value="all">All Departments</Option>
               {departments.map((dept) => (
-                <option key={dept._id} value={dept.name}>
+                <Option key={dept._id} value={dept.name}>
                   {dept.name}
-                </option>
+                </Option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
             </label>
-            <select
+            <Select
               value={filters.status}
               onChange={(e) =>
                 setFilters({ ...filters, status: e.target.value })
               }
               className="input-field"
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+              <Option value="all">All Status</Option>
+              <Option value="active">Active</Option>
+              <Option value="inactive">Inactive</Option>
+            </Select>
           </div>
 
           <div>
@@ -350,7 +433,7 @@ const Users = () => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                 <FaSearch className="text-gray-400" />
               </div>
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) =>
@@ -457,21 +540,21 @@ const Users = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex space-x-2">
-                      <button
+                      <Button
                         onClick={() => openEditModal(user)}
                         className="text-blue-600 hover:text-blue-900 bg-blue-100 p-2 rounded-full"
                         title="Edit User"
                       >
                         <FaEdit />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => openLeaveBalanceModal(user)}
                         className="text-green-600 hover:text-green-900 bg-green-100 p-2 rounded-full"
                         title="Update Leave Balance"
                       >
                         <FaKey />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() =>
                           toggleUserStatus(user._id, user.isActive)
                         }
@@ -485,8 +568,22 @@ const Users = () => {
                         }
                       >
                         {user.isActive ? <FaToggleOn /> : <FaToggleOff />}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        onClick={() => sendCredentials(user._id)}
+                        className="text-indigo-600 hover:text-indigo-900 bg-indigo-100 p-2 rounded-full"
+                        title="Send Credentials by Email"
+                      >
+                        <FaEnvelope />
+                      </Button>
+                      <Button
+                        onClick={() => openPermissionsModal(user)}
+                        className="text-violet-600 hover:text-violet-900 bg-violet-100 p-2 rounded-full"
+                        title="Manage Permissions"
+                      >
+                        <FaShieldAlt />
+                      </Button>
+                      <Button
                         onClick={() => {
                           setSelectedUser(user);
                           setShowDeleteModal(true);
@@ -495,7 +592,7 @@ const Users = () => {
                         title="Delete User"
                       >
                         <FaTrash />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -529,6 +626,7 @@ const Users = () => {
         setFormData={setFormData}
         editingId={editingId}
         departments={departments}
+        allowedRoles={creatableRoles}
       />
 
       <LeaveBalanceModal
@@ -553,6 +651,93 @@ const Users = () => {
         onConfirm={handleDelete}
         selectedUser={selectedUser}
       />
+
+      {showPermissionsModal && selectedUser && (
+        <div
+          className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPermissionsModal(false);
+              setSelectedUser(null);
+            }
+          }}
+        >
+          <div className="relative my-6 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+            <h3 className="text-lg font-semibold mb-2">Manage Permissions</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {selectedUser.name} ({selectedUser.role})
+            </p>
+
+            <div className="flex items-center gap-2 mb-4">
+              <Input
+                type="checkbox"
+                checked={permissionsDraft.allowCrossDepartment}
+                onChange={(e) =>
+                  setPermissionsDraft((prev) => ({
+                    ...prev,
+                    allowCrossDepartment: e.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded"
+              />
+              <label className="text-sm text-gray-700">Allow access to all departments</label>
+            </div>
+
+            <div className="mb-4">
+              <label className="form-label">Extra Department Access</label>
+              <MultiSelect
+                options={departments.map((dept) => ({ value: dept.name, label: dept.name }))}
+                values={permissionsDraft.allowedDepartments || []}
+                onChange={(selected) =>
+                  setPermissionsDraft((prev) => ({ ...prev, allowedDepartments: selected }))
+                }
+                placeholder="Select department to add"
+                summaryLabel="You selected departments"
+              />
+            </div>
+
+            <div className="border rounded-lg p-3 max-h-72 overflow-y-auto">
+              <p className="text-sm font-medium mb-2">Feature Overrides</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {Object.keys(FEATURE_ACCESS).map((featureKey) => {
+                  const value = permissionsDraft.featurePermissions?.[featureKey];
+                  return (
+                    <Button
+                      key={featureKey}
+                      type="button"
+                      onClick={() => handlePermissionToggle(featureKey)}
+                      className={`justify-start text-sm ${
+                        value === true
+                          ? "bg-green-100 text-green-700"
+                          : value === false
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {featureKey} ({value === true ? "allow" : value === false ? "deny" : "inherit"})
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5">
+              <Button
+                className="btn-secondary"
+                onClick={() => {
+                  setShowPermissionsModal(false);
+                  setSelectedUser(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button className="btn-primary" onClick={savePermissions}>
+                Save Permissions
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

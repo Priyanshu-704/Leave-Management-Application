@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const {
+  getPublicSettings,
   getSettings,
   updateSettings,
   getSettingsSection,
@@ -11,6 +12,9 @@ const {
 } = require('../controllers/settingsController');
 
 const router = express.Router();
+
+// Public settings route for all users (including logged-out users)
+router.get('/public', getPublicSettings);
 
 // All settings routes require admin access
 router.use(protect);

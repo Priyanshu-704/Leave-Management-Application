@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
+import { Button, Input, Select, Option } from "@/components/ui";
 import { format } from "date-fns";
 import {
   FaCalendarAlt,
@@ -8,9 +10,20 @@ import {
   FaFileExcel,
   FaEye,
   FaTimes,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaHourglassHalf,
+  FaBan,
+  FaClipboardList,
+  FaUmbrellaBeach,
+  FaUserInjured,
+  FaUser,
+  FaMoneyBillWave,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
-import instance from "../services/axios";
+import { leaveService } from "@/services/api";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 const LeaveHistory = () => {
   const [leaves, setLeaves] = useState([]);
@@ -24,6 +37,9 @@ const LeaveHistory = () => {
   });
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [exporting, setExporting] = useState("");
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
+  useBodyScrollLock(showDetails && !!selectedLeave);
 
   useEffect(() => {
     fetchLeaves();
@@ -31,8 +47,8 @@ const LeaveHistory = () => {
 
   const fetchLeaves = async () => {
     try {
-      const response = await instance.get("/leaves/my-leaves");
-      setLeaves(response.data);
+      const response = await leaveService.getMyLeaves();
+      setLeaves(response);
     } catch (error) {
       toast.error(error, "Failed to fetch leave history");
     } finally {
@@ -58,15 +74,15 @@ const LeaveHistory = () => {
   const getStatusIcon = (status) => {
     switch (status) {
       case "approved":
-        return "✅";
+        return <FaCheckCircle className="mr-1" />;
       case "rejected":
-        return "❌";
+        return <FaTimesCircle className="mr-1" />;
       case "pending":
-        return "⏳";
+        return <FaHourglassHalf className="mr-1" />;
       case "cancelled":
-        return "🚫";
+        return <FaBan className="mr-1" />;
       default:
-        return "📝";
+        return <FaClipboardList className="mr-1" />;
     }
   };
 
@@ -76,8 +92,8 @@ const LeaveHistory = () => {
     if (filters.leaveType !== "all" && leave.leaveType !== filters.leaveType)
       return false;
 
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (debouncedSearch) {
+      const searchLower = debouncedSearch.toLowerCase();
       if (
         !leave.reason.toLowerCase().includes(searchLower) &&
         !leave.leaveType.toLowerCase().includes(searchLower)
@@ -97,14 +113,50 @@ const LeaveHistory = () => {
     return true;
   });
 
-  const exportToPDF = () => {
-    toast.success("Exporting to PDF...");
-    // Implement PDF export logic
-  };
+  const downloadExport = async (formatType) => {
+    try {
+      setExporting(formatType);
 
-  const exportToExcel = () => {
-    toast.success("Exporting to Excel...");
-    // Implement Excel export logic
+      const params = {
+        format: formatType,
+        ...(filters.status !== "all" && { status: filters.status }),
+        ...(filters.leaveType !== "all" && { leaveType: filters.leaveType }),
+        ...(debouncedSearch.trim() && { search: debouncedSearch.trim() }),
+        ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
+        ...(filters.dateTo && { dateTo: filters.dateTo }),
+      };
+
+      const response = await leaveService.exportMyLeaves(params);
+
+      const disposition = response.headers["content-disposition"] || "";
+      const filenameMatch = disposition.match(/filename="?(.*)"?$/i);
+      const fileName =
+        filenameMatch?.[1] ||
+        `leave-history-${new Date().toISOString().split("T")[0]}.${formatType === "excel" ? "xls" : "pdf"}`;
+
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"] || "application/octet-stream",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success(
+        `Exported to ${formatType === "excel" ? "Excel" : "PDF"} successfully`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        `Failed to export ${formatType === "excel" ? "Excel" : "PDF"}`;
+      toast.error(errorMessage);
+    } finally {
+      setExporting("");
+    }
   };
 
   const cancelLeave = async (leaveId) => {
@@ -113,7 +165,7 @@ const LeaveHistory = () => {
 
     try {
       // Send a request body with comments
-      await instance.put(`/leaves/${leaveId}/cancel`, {
+      await leaveService.cancelLeave(leaveId, {
         comments: "Cancelled by employee",
       });
       toast.success("Leave request cancelled successfully");
@@ -126,11 +178,7 @@ const LeaveHistory = () => {
     }
   };
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <PageSkeleton rows={6} />;
   }
 
   return (
@@ -139,20 +187,22 @@ const LeaveHistory = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Leave History</h1>
         <div className="flex space-x-3">
-          <button
-            onClick={exportToPDF}
+          <Button
+            onClick={() => downloadExport("pdf")}
+            disabled={exporting === "pdf"}
             className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             <FaFilePdf />
-            <span>PDF</span>
-          </button>
-          <button
-            onClick={exportToExcel}
+            <span>{exporting === "pdf" ? "Exporting..." : "PDF"}</span>
+          </Button>
+          <Button
+            onClick={() => downloadExport("excel")}
+            disabled={exporting === "excel"}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             <FaFileExcel />
-            <span>Excel</span>
-          </button>
+            <span>{exporting === "excel" ? "Exporting..." : "Excel"}</span>
+          </Button>
         </div>
       </div>
 
@@ -168,45 +218,45 @@ const LeaveHistory = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
             </label>
-            <select
+            <Select
               value={filters.status}
               onChange={(e) =>
                 setFilters({ ...filters, status: e.target.value })
               }
               className="input-field"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+              <Option value="all">All Status</Option>
+              <Option value="pending">Pending</Option>
+              <Option value="approved">Approved</Option>
+              <Option value="rejected">Rejected</Option>
+              <Option value="cancelled">Cancelled</Option>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Leave Type
             </label>
-            <select
+            <Select
               value={filters.leaveType}
               onChange={(e) =>
                 setFilters({ ...filters, leaveType: e.target.value })
               }
               className="input-field"
             >
-              <option value="all">All Types</option>
-              <option value="annual">Annual Leave</option>
-              <option value="sick">Sick Leave</option>
-              <option value="personal">Personal Leave</option>
-              <option value="unpaid">Unpaid Leave</option>
-            </select>
+              <Option value="all">All Types</Option>
+              <Option value="annual">Annual Leave</Option>
+              <Option value="sick">Sick Leave</Option>
+              <Option value="personal">Personal Leave</Option>
+              <Option value="unpaid">Unpaid Leave</Option>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               From Date
             </label>
-            <input
+            <Input
               type="date"
               value={filters.dateFrom}
               onChange={(e) =>
@@ -220,7 +270,7 @@ const LeaveHistory = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               To Date
             </label>
-            <input
+            <Input
               type="date"
               value={filters.dateTo}
               onChange={(e) =>
@@ -238,7 +288,7 @@ const LeaveHistory = () => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                 <FaSearch className="text-gray-400" />
               </div>
-              <input
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) =>
@@ -285,10 +335,10 @@ const LeaveHistory = () => {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
                         <span className="text-lg">
-                          {leave.leaveType === "annual" && "🏖️"}
-                          {leave.leaveType === "sick" && "🤒"}
-                          {leave.leaveType === "personal" && "👤"}
-                          {leave.leaveType === "unpaid" && "💰"}
+                          {leave.leaveType === "annual" && <FaUmbrellaBeach />}
+                          {leave.leaveType === "sick" && <FaUserInjured />}
+                          {leave.leaveType === "personal" && <FaUser />}
+                          {leave.leaveType === "unpaid" && <FaMoneyBillWave />}
                         </span>
                       </div>
                       <div className="ml-4">
@@ -325,7 +375,7 @@ const LeaveHistory = () => {
                     {format(new Date(leave.appliedOn), "MMM dd, yyyy")}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium">
-                    <button
+                    <Button
                       onClick={() => {
                         setSelectedLeave(leave);
                         setShowDetails(true);
@@ -333,14 +383,14 @@ const LeaveHistory = () => {
                       className="text-primary-600 hover:text-primary-900 mr-3"
                     >
                       <FaEye />
-                    </button>
+                    </Button>
                     {leave.status === "pending" && (
-                      <button
+                      <Button
                         onClick={() => cancelLeave(leave._id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <FaTimes />
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -364,16 +414,21 @@ const LeaveHistory = () => {
 
       {/* Leave Details Modal */}
       {showDetails && selectedLeave && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+        <div
+          className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowDetails(false);
+          }}
+        >
+          <div className="relative my-6 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Leave Request Details</h3>
-              <button
+              <Button
                 onClick={() => setShowDetails(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <FaTimes />
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-4">
@@ -452,12 +507,12 @@ const LeaveHistory = () => {
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button
+              <Button
                 onClick={() => setShowDetails(false)}
                 className="btn-secondary"
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         </div>

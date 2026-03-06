@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
+import { Button, Input, Select, Option, MultiSelect } from "@/components/ui";
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import { departmentService, fileService, userService } from "@/services/api";
 import { FaTimes, FaUpload, FaTags, FaLock, FaGlobe, FaUsers } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const UploadFileModal = ({ onClose, onSuccess }) => {
+  useBodyScrollLock(true);
   const { user, isAdmin } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
@@ -29,12 +30,12 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
     if (isAdmin) {
       fetchUsers();
     }
-  }, []);
+  }, [isAdmin]);
 
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get(`${API_URL}/departments?limit=100`);
-      setDepartments(response.data.data || []);
+      const response = await departmentService.getDepartments({ limit: 100 });
+      setDepartments(response.data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
     }
@@ -42,8 +43,8 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/users?limit=1000`);
-      setUsers(response.data.users || []);
+      const response = await userService.getUsers({ limit: 1000 });
+      setUsers(response.users || []);
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -79,28 +80,6 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
     setFormData({ ...formData, allowedRoles: newRoles });
   };
 
-  const handleDepartmentChange = (e) => {
-    const options = e.target.options;
-    const selected = [];
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        selected.push(options[i].value);
-      }
-    }
-    setFormData({ ...formData, allowedDepartments: selected });
-  };
-
-  const handleUserChange = (e) => {
-    const options = e.target.options;
-    const selected = [];
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        selected.push(options[i].value);
-      }
-    }
-    setFormData({ ...formData, allowedUsers: selected });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
@@ -125,11 +104,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
     }
 
     try {
-      await axios.post(`${API_URL}/files/upload`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await fileService.upload(form);
       toast.success('File uploaded successfully');
       onSuccess();
     } catch (error) {
@@ -141,16 +116,21 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+    <div
+      className="fixed inset-0 z-50 bg-white/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative my-6 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold flex items-center">
             <FaUpload className="mr-2 text-primary-600" />
             Upload File
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -158,7 +138,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
           <div>
             <label className="form-label">Select File *</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <input
+              <Input
                 type="file"
                 onChange={handleFileChange}
                 className="hidden"
@@ -185,21 +165,21 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
           {/* Category */}
           <div>
             <label className="form-label">Category</label>
-            <select
+            <Select
               name="category"
               value={formData.category}
               onChange={handleInputChange}
               className="input-field"
             >
-              <option value="document">Document</option>
-              <option value="policy">Policy</option>
-              <option value="form">Form</option>
-              <option value="report">Report</option>
-              <option value="training">Training Material</option>
-              <option value="employee-document">Employee Document</option>
-              <option value="contract">Contract</option>
-              <option value="other">Other</option>
-            </select>
+              <Option value="document">Document</Option>
+              <Option value="policy">Policy</Option>
+              <Option value="form">Form</Option>
+              <Option value="report">Report</Option>
+              <Option value="training">Training Material</Option>
+              <Option value="employee-document">Employee Document</Option>
+              <Option value="contract">Contract</Option>
+              <Option value="other">Other</Option>
+            </Select>
           </div>
 
           {/* Description */}
@@ -220,7 +200,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
             <label className="form-label flex items-center">
               <FaTags className="mr-1 text-gray-400" /> Tags
             </label>
-            <input
+            <Input
               type="text"
               name="tags"
               value={formData.tags}
@@ -236,7 +216,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
             <div className="grid grid-cols-3 gap-2">
               {isAdmin && (
                 <label className="flex items-center space-x-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
-                  <input
+                  <Input
                     type="radio"
                     name="accessType"
                     value="public"
@@ -249,7 +229,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
                 </label>
               )}
               <label className="flex items-center space-x-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
+                <Input
                   type="radio"
                   name="accessType"
                   value="restricted"
@@ -261,7 +241,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
                 <span className="text-sm">Restricted</span>
               </label>
               <label className="flex items-center space-x-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
+                <Input
                   type="radio"
                   name="accessType"
                   value="department"
@@ -279,19 +259,16 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
           {formData.accessType === 'restricted' && (
             <div>
               <label className="form-label">Allowed Roles</label>
-              <div className="flex flex-wrap gap-3">
-                {['admin', 'manager', 'employee'].map(role => (
-                  <label key={role} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.allowedRoles.includes(role)}
-                      onChange={() => handleRoleChange(role)}
-                      className="h-4 w-4 text-primary-600 rounded"
-                    />
-                    <span className="text-sm capitalize">{role}</span>
-                  </label>
-                ))}
-              </div>
+              <MultiSelect
+                options={['admin', 'manager', 'employee'].map((role) => ({
+                  value: role,
+                  label: role.charAt(0).toUpperCase() + role.slice(1),
+                }))}
+                values={formData.allowedRoles || []}
+                onChange={(selected) => setFormData({ ...formData, allowedRoles: selected })}
+                placeholder="Select role to add"
+                summaryLabel="You selected roles"
+              />
             </div>
           )}
 
@@ -299,19 +276,13 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
           {(formData.accessType === 'restricted' || isAdmin) && (
             <div>
               <label className="form-label">Allowed Departments</label>
-              <select
-                multiple
-                value={formData.allowedDepartments}
-                onChange={handleDepartmentChange}
-                className="input-field h-32"
-              >
-                {departments.map(dept => (
-                  <option key={dept._id} value={dept.name}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+              <MultiSelect
+                options={departments.map((dept) => ({ value: dept.name, label: dept.name }))}
+                values={formData.allowedDepartments || []}
+                onChange={(selected) => setFormData({ ...formData, allowedDepartments: selected })}
+                placeholder="Select department to add"
+                summaryLabel="You selected departments"
+              />
             </div>
           )}
 
@@ -319,18 +290,16 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
           {isAdmin && formData.accessType === 'restricted' && (
             <div>
               <label className="form-label">Specific Users</label>
-              <select
-                multiple
-                value={formData.allowedUsers}
-                onChange={handleUserChange}
-                className="input-field h-32"
-              >
-                {users.map(user => (
-                  <option key={user._id} value={user._id}>
-                    {user.name} ({user.email})
-                  </option>
-                ))}
-              </select>
+              <MultiSelect
+                options={users.map((item) => ({
+                  value: item._id,
+                  label: `${item.name} (${item.email})`,
+                }))}
+                values={formData.allowedUsers || []}
+                onChange={(selected) => setFormData({ ...formData, allowedUsers: selected })}
+                placeholder="Select user to add"
+                summaryLabel="You selected users"
+              />
             </div>
           )}
 
@@ -338,7 +307,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center">
               <label className="flex items-center space-x-2">
-                <input
+                <Input
                   type="checkbox"
                   name="allowDownload"
                   checked={formData.allowDownload}
@@ -351,7 +320,7 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
 
             <div>
               <label className="form-label">Expiry Date</label>
-              <input
+              <Input
                 type="date"
                 name="expiryDate"
                 value={formData.expiryDate}
@@ -364,21 +333,21 @@ const UploadFileModal = ({ onClose, onSuccess }) => {
 
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4">
-            <button
+            <Button
               type="button"
               onClick={onClose}
               className="btn-secondary"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={uploading || !selectedFile}
               className="btn-primary flex items-center space-x-2"
             >
               <FaUpload />
               <span>{uploading ? 'Uploading...' : 'Upload File'}</span>
-            </button>
+            </Button>
           </div>
         </form>
       </div>
