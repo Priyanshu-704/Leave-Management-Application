@@ -44,6 +44,23 @@ const issueAuthTokens = async (user, sessionId, res) => {
   user.refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await user.save();
   setAuthCookies(res, accessToken, refreshToken);
+  return { accessToken, refreshToken };
+};
+
+const getRefreshTokenFromRequest = (req) => {
+  const cookies = parseCookies(req.headers.cookie || "");
+  if (cookies.refreshToken) return cookies.refreshToken;
+
+  if (req.body?.refreshToken) {
+    return String(req.body.refreshToken);
+  }
+
+  const authHeader = req.headers.authorization || "";
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+
+  return null;
 };
 
 const authUserPayload = (user) => ({
@@ -119,9 +136,12 @@ exports.register = async (req, res) => {
       deviceName: parseDeviceName(req.headers["user-agent"]),
     });
 
-    await issueAuthTokens(user, sessionId, res);
+    const tokens = await issueAuthTokens(user, sessionId, res);
 
-    res.status(201).json(authUserPayload(user));
+    res.status(201).json({
+      ...authUserPayload(user),
+      ...tokens,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -261,9 +281,12 @@ exports.login = async (req, res) => {
       await user.save();
     }
 
-    await issueAuthTokens(user, sessionId, res);
+    const tokens = await issueAuthTokens(user, sessionId, res);
 
-    res.json(authUserPayload(user));
+    res.json({
+      ...authUserPayload(user),
+      ...tokens,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -274,8 +297,7 @@ exports.login = async (req, res) => {
 // @access  Public
 exports.refresh = async (req, res) => {
   try {
-    const cookies = parseCookies(req.headers.cookie || "");
-    const refreshToken = cookies.refreshToken;
+    const refreshToken = getRefreshTokenFromRequest(req);
     if (!refreshToken) {
       return res.status(401).json({ message: "Refresh token missing" });
     }
@@ -306,9 +328,12 @@ exports.refresh = async (req, res) => {
       return res.status(401).json({ message: "Session expired" });
     }
 
-    await issueAuthTokens(user, decoded.sessionId || user.activeSessionId, res);
+    const tokens = await issueAuthTokens(user, decoded.sessionId || user.activeSessionId, res);
 
-    return res.json({ success: true });
+    return res.json({
+      success: true,
+      ...tokens,
+    });
   } catch (error) {
     clearAuthCookies(res);
     return res.status(401).json({ message: "Invalid refresh session" });

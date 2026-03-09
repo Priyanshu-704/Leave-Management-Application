@@ -7,6 +7,8 @@ const maxRetryAttempts = Number(import.meta.env.VITE_API_RETRY_ATTEMPTS || 2);
 const retryBaseDelayMs = Number(import.meta.env.VITE_API_RETRY_BASE_DELAY_MS || 600);
 const retryMaxDelayMs = Number(import.meta.env.VITE_API_RETRY_MAX_DELAY_MS || 3000);
 const retryableMethods = new Set(["get", "head", "options", "put", "delete"]);
+const ACCESS_TOKEN_STORAGE_KEY = "authAccessToken";
+const REFRESH_TOKEN_STORAGE_KEY = "authRefreshToken";
 
 let networkListenersRegistered = false;
 let hasShownOfflineToast = false;
@@ -36,6 +38,43 @@ const shouldRetryRequest = (error) => {
 
   if (isNetworkOrTimeoutError(error)) return true;
   return isRetryableStatus(error?.response?.status);
+};
+
+const readStorage = (key) => {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+};
+
+export const getStoredAccessToken = () => readStorage(ACCESS_TOKEN_STORAGE_KEY);
+
+export const getStoredRefreshToken = () => readStorage(REFRESH_TOKEN_STORAGE_KEY);
+
+export const setAuthTokens = ({ accessToken, refreshToken } = {}) => {
+  if (typeof window === "undefined") return;
+  try {
+    if (accessToken) {
+      localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+    }
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    }
+  } catch (_error) {
+    // ignore storage failures
+  }
+};
+
+export const clearAuthTokens = () => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+  } catch (_error) {
+    // ignore storage failures
+  }
 };
 
 if (typeof window !== "undefined" && !networkListenersRegistered) {
@@ -125,6 +164,17 @@ export const axiosInstance = axios.create({
   },
 });
 
+const applyAuthHeader = (config) => {
+  const token = getStoredAccessToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
+axiosInstance.interceptors.request.use(applyAuthHeader);
+
 let isRefreshing = false;
 let pendingRequests = [];
 
@@ -158,11 +208,17 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axiosInstance.post("/auth/refresh");
+        const refreshToken = getStoredRefreshToken();
+        const refreshResponse = await axiosInstance.post("/auth/refresh", refreshToken ? { refreshToken } : {});
+        setAuthTokens({
+          accessToken: refreshResponse?.data?.accessToken,
+          refreshToken: refreshResponse?.data?.refreshToken,
+        });
         resolvePendingRequests(null);
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         resolvePendingRequests(refreshError);
+        clearAuthTokens();
         if (window.location.pathname !== "/login") {
           window.location.href = "/login";
         }

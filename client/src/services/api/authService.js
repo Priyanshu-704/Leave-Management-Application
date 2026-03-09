@@ -1,9 +1,19 @@
-import { axiosInstance, serviceRequest } from "@/lib/api";
+import {
+  axiosInstance,
+  serviceRequest,
+  setAuthTokens,
+  clearAuthTokens,
+  getStoredRefreshToken,
+} from "@/lib/api";
 
 export const authService = {
   async login(payload) {
     return serviceRequest(async () => {
       const response = await axiosInstance.post("/auth/login", payload);
+      setAuthTokens({
+        accessToken: response?.data?.accessToken,
+        refreshToken: response?.data?.refreshToken,
+      });
       return response.data;
     }, "Login failed");
   },
@@ -17,7 +27,12 @@ export const authService = {
 
   async refresh() {
     return serviceRequest(async () => {
-      const response = await axiosInstance.post("/auth/refresh");
+      const refreshToken = getStoredRefreshToken();
+      const response = await axiosInstance.post("/auth/refresh", refreshToken ? { refreshToken } : {});
+      setAuthTokens({
+        accessToken: response?.data?.accessToken,
+        refreshToken: response?.data?.refreshToken,
+      });
       return response.data;
     }, "Failed to refresh session");
   },
@@ -38,8 +53,12 @@ export const authService = {
 
   async logoutSession() {
     return serviceRequest(async () => {
-      const response = await axiosInstance.post("/auth/logout-session");
-      return response.data;
+      try {
+        const response = await axiosInstance.post("/auth/logout-session");
+        return response.data;
+      } finally {
+        clearAuthTokens();
+      }
     }, "Failed to logout session");
   },
 

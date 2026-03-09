@@ -1,7 +1,9 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useContext, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { authService } from "@/services/api";
+import { clearAuthTokens } from "@/lib/api";
 
 const AuthContext = createContext();
 
@@ -19,6 +21,9 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Error fetching user:', error.response || error);
 
+        if (error.response?.status === 401) {
+          clearAuthTokens();
+        }
         if (error.response?.status === 500) {
           toast.error('Server error. Please try again later.');
         }
@@ -48,7 +53,7 @@ export const AuthProvider = ({ children }) => {
           isNewDevice: response.isNewDevice,
         };
       }
-      const userData = response;
+      const { accessToken: _accessToken, refreshToken: _refreshToken, ...userData } = response || {};
       setUser(userData);
       
       if (userData.forcePasswordChange) {
