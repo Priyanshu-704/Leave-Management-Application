@@ -7,7 +7,11 @@ const { WebSocketServer } = require("ws");
 const swaggerUi = require("swagger-ui-express");
 const swaggerDocument = require("./docs/swagger");
 dotenv.config();
-const { FRONTEND_URL, API_BASE_URL, CORS_ORIGINS } = require("./config/appConfig");
+const {
+  FRONTEND_URL,
+  API_BASE_URL,
+  CORS_ORIGINS,
+} = require("./config/appConfig");
 
 const app = express();
 
@@ -28,6 +32,25 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get("/api/health", (req, res) => {
+  const dbState = mongoose.connection.readyState;
+
+  const dbStatus = {
+    0: "Disconnected",
+    1: "Connected",
+    2: "Connecting",
+    3: "Disconnecting",
+  };
+
+  res.status(200).json({
+    status: "OK",
+    server: "Running",
+    database: dbStatus[dbState],
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Database connection
 require("./config/db")();
