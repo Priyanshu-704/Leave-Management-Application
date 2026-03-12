@@ -130,6 +130,30 @@ const swaggerDocument = {
           notes: { type: "string" },
         },
       },
+      AttendanceActionRequest: {
+        type: "object",
+        properties: {
+          note: {
+            type: "string",
+            nullable: true,
+            maxLength: 500,
+            description: "Optional note for check-in or check-out",
+          },
+          photo: { type: "string" },
+          location: {
+            type: "object",
+            properties: {
+              coordinates: {
+                type: "array",
+                minItems: 2,
+                maxItems: 2,
+                items: { type: "number" },
+              },
+              address: { type: "string" },
+            },
+          },
+        },
+      },
     },
   },
   paths: {
@@ -326,10 +350,14 @@ const swaggerDocument = {
     },
 
     "/api/attendance/checkin": {
-      post: secure("Attendance", "Check in"),
+      post: secure("Attendance", "Check in", {
+        requestBody: jsonRequest({ $ref: "#/components/schemas/AttendanceActionRequest" }, false),
+      }),
     },
     "/api/attendance/checkout": {
-      put: secure("Attendance", "Check out"),
+      put: secure("Attendance", "Check out", {
+        requestBody: jsonRequest({ $ref: "#/components/schemas/AttendanceActionRequest" }, false),
+      }),
     },
     "/api/attendance/today": {
       get: secure("Attendance", "Get today attendance"),

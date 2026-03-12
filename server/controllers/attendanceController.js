@@ -29,6 +29,7 @@ const haversineMeters = (lat1, lon1, lat2, lon2) => {
 exports.checkIn = async (req, res) => {
   try {
     const { location, note, photo } = req.body;
+    const normalizedNote = typeof note === "string" ? note.trim() : "";
     const policy = await getDefaultPolicy();
 
     if (policy?.attendance?.checkInEnabled === false) {
@@ -91,7 +92,7 @@ exports.checkIn = async (req, res) => {
       time: new Date(),
       ip,
       device: req.headers["user-agent"],
-      note: note || "",
+      note: normalizedNote,
     };
 
     // Only add location if it exists and has valid coordinates
@@ -149,6 +150,7 @@ exports.checkIn = async (req, res) => {
 exports.checkOut = async (req, res) => {
   try {
     const { location, note, photo } = req.body;
+    const normalizedNote = typeof note === "string" ? note.trim() : "";
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -185,7 +187,7 @@ exports.checkOut = async (req, res) => {
       time: new Date(),
       ip,
       device: req.headers["user-agent"],
-      note: note || "",
+      note: normalizedNote,
     };
 
     // Only add location if it exists and has valid coordinates

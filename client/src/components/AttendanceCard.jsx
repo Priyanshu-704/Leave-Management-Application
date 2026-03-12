@@ -121,7 +121,8 @@ const AttendanceCard = () => {
 
   const handleCheckIn = async () => {
     try {
-      await checkIn({ note });
+      const payload = note.trim() ? { note: note.trim() } : {};
+      await checkIn(payload);
       setNote("");
       setShowNoteInput(false);
     } catch (error) {
@@ -131,7 +132,8 @@ const AttendanceCard = () => {
 
   const handleCheckOut = async () => {
     try {
-      await checkOut({ note });
+      const payload = note.trim() ? { note: note.trim() } : {};
+      await checkOut(payload);
       setNote("");
       setShowNoteInput(false);
     } catch (error) {
@@ -289,13 +291,22 @@ const AttendanceCard = () => {
                 </div>
               </div>
             ) : (
-              <Button
-                onClick={() => setShowNoteInput(true)}
-                className="w-full btn-primary flex items-center justify-center space-x-2"
-              >
-                <FaSignInAlt />
-                <span>Check In</span>
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleCheckIn}
+                  disabled={loading}
+                  className="w-full btn-primary flex items-center justify-center space-x-2"
+                >
+                  <FaSignInAlt />
+                  <span>{loading ? "Processing..." : "Check In"}</span>
+                </Button>
+                <Button
+                  onClick={() => setShowNoteInput(true)}
+                  className="w-full btn-secondary"
+                >
+                  Add Note
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -349,13 +360,22 @@ const AttendanceCard = () => {
                 </div>
               </div>
             ) : (
-              <Button
-                onClick={() => setShowNoteInput(true)}
-                className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2"
-              >
-                <FaSignOutAlt />
-                <span>Check Out</span>
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleCheckOut}
+                  disabled={loading}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2"
+                >
+                  <FaSignOutAlt />
+                  <span>{loading ? "Processing..." : "Check Out"}</span>
+                </Button>
+                <Button
+                  onClick={() => setShowNoteInput(true)}
+                  className="w-full btn-secondary"
+                >
+                  Add Checkout Note
+                </Button>
+              </div>
             )}
           </div>
         )}

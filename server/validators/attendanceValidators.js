@@ -8,7 +8,7 @@ const locationSchema = Joi.object({
 exports.checkInSchema = Joi.object({
   body: Joi.object({
     location: locationSchema,
-    note: Joi.string().max(500).optional(),
+    note: Joi.string().max(500).allow("", null).optional(),
     photo: Joi.string().optional(),
   }).required(),
   params: Joi.object({}).unknown(true),
@@ -18,7 +18,7 @@ exports.checkInSchema = Joi.object({
 exports.checkOutSchema = Joi.object({
   body: Joi.object({
     location: locationSchema,
-    note: Joi.string().max(500).optional(),
+    note: Joi.string().max(500).allow("", null).optional(),
     photo: Joi.string().optional(),
   }).required(),
   params: Joi.object({}).unknown(true),
