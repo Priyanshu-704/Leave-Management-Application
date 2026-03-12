@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
@@ -17,73 +18,88 @@ import PageSkeleton from "./components/PageSkeleton";
 import { SettingsProvider } from "./context/SettingsContext";
 import { PORTAL_PATHS } from "./context/PortalPathContext";
 
+const importWithRetry = async (importer, retries = 1) => {
+  try {
+    return await importer();
+  } catch (error) {
+    if (retries <= 0) {
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return importWithRetry(importer, retries - 1);
+  }
+};
+
+const lazyWithRetry = (importer, retries = 1) =>
+  lazy(() => importWithRetry(importer, retries));
+
 // Route-level lazy loaded pages/components
-const Login = lazy(() => import("./pages/Login"));
-const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const ApplyLeave = lazy(() => import("./pages/ApplyLeave"));
-const LeaveHistory = lazy(() => import("./pages/LeaveHistory"));
-const LeaveRequests = lazy(() => import("./pages/LeaveRequests"));
-const Users = lazy(() => import("./pages/Users"));
-const Departments = lazy(() => import("./pages/Departments"));
-const DepartmentDetails = lazy(() => import("./pages/DepartmentDetails"));
-const DepartmentEdit = lazy(() => import("./pages/DepartmentEdit"));
-const DepartmentAnalytics = lazy(() => import("./pages/DepartmentAnalytics"));
-const AttendanceHistory = lazy(() => import("./pages/AttendanceHistory"));
-const Announcements = lazy(() => import("./pages/Announcements"));
-const OrganizationChart = lazy(() => import("./pages/OrganizationChart"));
-const FileManagement = lazy(() => import("./pages/FileManagement"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Settings = lazy(() => import("./pages/Settings"));
-const ShiftManagement = lazy(() => import("./pages/ShiftManagement"));
-const JobPostings = lazy(() => import("./pages/recruitment/JobPostings"));
-const CandidateTracking = lazy(() => import("./pages/recruitment/CandidateTracking"));
-const InterviewScheduling = lazy(() => import("./pages/recruitment/InterviewScheduling"));
-const OfferLetters = lazy(() => import("./pages/recruitment/OfferLetters"));
-const OnboardingChecklist = lazy(() => import("./pages/recruitment/OnboardingChecklist"));
-const DocumentVerification = lazy(() => import("./pages/recruitment/DocumentVerification"));
-const BackgroundChecks = lazy(() => import("./pages/recruitment/BackgroundChecks"));
-const ProbationTracking = lazy(() => import("./pages/recruitment/ProbationTracking"));
-const CourseCatalog = lazy(() => import("./pages/learning/CourseCatalog"));
-const TrainingNominations = lazy(() => import("./pages/learning/TrainingNominations"));
-const TrainingCalendar = lazy(() => import("./pages/learning/TrainingCalendar"));
-const CertificationTracking = lazy(() => import("./pages/learning/CertificationTracking"));
-const FeedbackForms = lazy(() => import("./pages/learning/FeedbackForms"));
-const QuizAssessment = lazy(() => import("./pages/learning/QuizAssessment"));
-const LearningPaths = lazy(() => import("./pages/learning/LearningPaths"));
-const AIInsights = lazy(() => import("./pages/AIInsights"));
-const Unauthorized = lazy(() => import("./pages/Unauthorized"));
-const GeoFencedCheckIn = lazy(() => import("./pages/workforce/GeoFencedCheckIn"));
-const WeekendHolidayMaintain = lazy(() => import("./pages/workforce/WeekendHolidayMaintain"));
-const CheckInControl = lazy(() => import("./pages/workforce/CheckInControl"));
-const RequestWorkFromHome = lazy(() => import("./pages/workforce/RequestWorkFromHome"));
-const SalarySlips = lazy(() => import("./pages/workforce/SalarySlips"));
-const AutomaticLeaveApproval = lazy(() => import("./pages/workforce/AutomaticLeaveApproval"));
-const LeaveDeductionCalculation = lazy(() => import("./pages/workforce/LeaveDeductionCalculation"));
-const SalaryCalculation = lazy(() => import("./pages/workforce/SalaryCalculation"));
-const CompanyAssets = lazy(() => import("./pages/workforce/CompanyAssets"));
-const AssetAllocationTracking = lazy(() => import("./pages/workforce/AssetAllocationTracking"));
-const AssetReturnOnExit = lazy(() => import("./pages/workforce/AssetReturnOnExit"));
-const InventoryManagement = lazy(() => import("./pages/workforce/InventoryManagement"));
-const ProjectAllocation = lazy(() => import("./pages/workforce/ProjectAllocation"));
-const TaskAssignment = lazy(() => import("./pages/workforce/TaskAssignment"));
-const TimesheetEntry = lazy(() => import("./pages/workforce/TimesheetEntry"));
-const ProjectBilling = lazy(() => import("./pages/workforce/ProjectBilling"));
-const ResourcePlanning = lazy(() => import("./pages/workforce/ResourcePlanning"));
-const MilestoneTracking = lazy(() => import("./pages/workforce/MilestoneTracking"));
-const GanttChart = lazy(() => import("./pages/workforce/GanttChart"));
-const CapacityPlanning = lazy(() => import("./pages/workforce/CapacityPlanning"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Layout = lazy(() => import("./components/Layout"));
-const CandidateLayout = lazy(() => import("./components/candidate/CandidateLayout"));
-const CandidateLogin = lazy(() => import("./pages/candidate/CandidateLogin"));
-const CandidateRegister = lazy(() => import("./pages/candidate/CandidateRegister"));
-const CandidateCareers = lazy(() => import("./pages/candidate/CandidateCareers"));
-const CandidateDashboard = lazy(() => import("./pages/candidate/CandidateDashboard"));
-const CandidateJobs = lazy(() => import("./pages/candidate/CandidateJobs"));
-const CandidateApplications = lazy(() => import("./pages/candidate/CandidateApplications"));
-const CandidateProfile = lazy(() => import("./pages/candidate/CandidateProfile"));
+const Login = lazyWithRetry(() => import("./pages/Login"));
+const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
+const ApplyLeave = lazyWithRetry(() => import("./pages/ApplyLeave"));
+const LeaveHistory = lazyWithRetry(() => import("./pages/LeaveHistory"));
+const LeaveRequests = lazyWithRetry(() => import("./pages/LeaveRequests"));
+const Users = lazyWithRetry(() => import("./pages/Users"));
+const Departments = lazyWithRetry(() => import("./pages/Departments"));
+const DepartmentDetails = lazyWithRetry(() => import("./pages/DepartmentDetails"));
+const DepartmentEdit = lazyWithRetry(() => import("./pages/DepartmentEdit"));
+const DepartmentAnalytics = lazyWithRetry(() => import("./pages/DepartmentAnalytics"));
+const AttendanceHistory = lazyWithRetry(() => import("./pages/AttendanceHistory"));
+const Announcements = lazyWithRetry(() => import("./pages/Announcements"));
+const OrganizationChart = lazyWithRetry(() => import("./pages/OrganizationChart"));
+const FileManagement = lazyWithRetry(() => import("./pages/FileManagement"));
+const Profile = lazyWithRetry(() => import("./pages/Profile"));
+const Settings = lazyWithRetry(() => import("./pages/Settings"));
+const ShiftManagement = lazyWithRetry(() => import("./pages/ShiftManagement"));
+const JobPostings = lazyWithRetry(() => import("./pages/recruitment/JobPostings"));
+const CandidateTracking = lazyWithRetry(() => import("./pages/recruitment/CandidateTracking"));
+const InterviewScheduling = lazyWithRetry(() => import("./pages/recruitment/InterviewScheduling"));
+const OfferLetters = lazyWithRetry(() => import("./pages/recruitment/OfferLetters"));
+const OnboardingChecklist = lazyWithRetry(() => import("./pages/recruitment/OnboardingChecklist"));
+const DocumentVerification = lazyWithRetry(() => import("./pages/recruitment/DocumentVerification"));
+const BackgroundChecks = lazyWithRetry(() => import("./pages/recruitment/BackgroundChecks"));
+const ProbationTracking = lazyWithRetry(() => import("./pages/recruitment/ProbationTracking"));
+const CourseCatalog = lazyWithRetry(() => import("./pages/learning/CourseCatalog"));
+const TrainingNominations = lazyWithRetry(() => import("./pages/learning/TrainingNominations"));
+const TrainingCalendar = lazyWithRetry(() => import("./pages/learning/TrainingCalendar"));
+const CertificationTracking = lazyWithRetry(() => import("./pages/learning/CertificationTracking"));
+const FeedbackForms = lazyWithRetry(() => import("./pages/learning/FeedbackForms"));
+const QuizAssessment = lazyWithRetry(() => import("./pages/learning/QuizAssessment"));
+const LearningPaths = lazyWithRetry(() => import("./pages/learning/LearningPaths"));
+const AIInsights = lazyWithRetry(() => import("./pages/AIInsights"));
+const Unauthorized = lazyWithRetry(() => import("./pages/Unauthorized"));
+const GeoFencedCheckIn = lazyWithRetry(() => import("./pages/workforce/GeoFencedCheckIn"));
+const WeekendHolidayMaintain = lazyWithRetry(() => import("./pages/workforce/WeekendHolidayMaintain"));
+const CheckInControl = lazyWithRetry(() => import("./pages/workforce/CheckInControl"));
+const RequestWorkFromHome = lazyWithRetry(() => import("./pages/workforce/RequestWorkFromHome"));
+const SalarySlips = lazyWithRetry(() => import("./pages/workforce/SalarySlips"));
+const AutomaticLeaveApproval = lazyWithRetry(() => import("./pages/workforce/AutomaticLeaveApproval"));
+const LeaveDeductionCalculation = lazyWithRetry(() => import("./pages/workforce/LeaveDeductionCalculation"));
+const SalaryCalculation = lazyWithRetry(() => import("./pages/workforce/SalaryCalculation"));
+const CompanyAssets = lazyWithRetry(() => import("./pages/workforce/CompanyAssets"));
+const AssetAllocationTracking = lazyWithRetry(() => import("./pages/workforce/AssetAllocationTracking"));
+const AssetReturnOnExit = lazyWithRetry(() => import("./pages/workforce/AssetReturnOnExit"));
+const InventoryManagement = lazyWithRetry(() => import("./pages/workforce/InventoryManagement"));
+const ProjectAllocation = lazyWithRetry(() => import("./pages/workforce/ProjectAllocation"));
+const TaskAssignment = lazyWithRetry(() => import("./pages/workforce/TaskAssignment"));
+const TimesheetEntry = lazyWithRetry(() => import("./pages/workforce/TimesheetEntry"));
+const ProjectBilling = lazyWithRetry(() => import("./pages/workforce/ProjectBilling"));
+const ResourcePlanning = lazyWithRetry(() => import("./pages/workforce/ResourcePlanning"));
+const MilestoneTracking = lazyWithRetry(() => import("./pages/workforce/MilestoneTracking"));
+const GanttChart = lazyWithRetry(() => import("./pages/workforce/GanttChart"));
+const CapacityPlanning = lazyWithRetry(() => import("./pages/workforce/CapacityPlanning"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const Layout = lazyWithRetry(() => import("./components/Layout"));
+const CandidateLayout = lazyWithRetry(() => import("./components/candidate/CandidateLayout"));
+const CandidateLogin = lazyWithRetry(() => import("./pages/candidate/CandidateLogin"));
+const CandidateRegister = lazyWithRetry(() => import("./pages/candidate/CandidateRegister"));
+const CandidateCareers = lazyWithRetry(() => import("./pages/candidate/CandidateCareers"));
+const CandidateDashboard = lazyWithRetry(() => import("./pages/candidate/CandidateDashboard"));
+const CandidateJobs = lazyWithRetry(() => import("./pages/candidate/CandidateJobs"));
+const CandidateApplications = lazyWithRetry(() => import("./pages/candidate/CandidateApplications"));
+const CandidateProfile = lazyWithRetry(() => import("./pages/candidate/CandidateProfile"));
 
 // Loading Component (Fallback)
 const PageLoader = () => (
@@ -95,12 +111,21 @@ const PageLoader = () => (
 function App() {
   return (
     <Router>
+      <AppShell />
+    </Router>
+  );
+}
+
+function AppShell() {
+  const location = useLocation();
+
+  return (
       <AuthProvider>
         <SettingsProvider>
           <AttendanceProvider>
             <SessionRecovery />
             <Toaster position="top-right" />
-            <AppErrorBoundary>
+            <AppErrorBoundary resetKey={location.pathname}>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                 <Route path="/login" element={<Login />} />
@@ -217,7 +242,6 @@ function App() {
           </AttendanceProvider>
         </SettingsProvider>
       </AuthProvider>
-    </Router>
   );
 }
 

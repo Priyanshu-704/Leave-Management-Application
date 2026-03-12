@@ -42,4 +42,11 @@ export const attendanceService = {
       return response.data;
     }, "Failed to fetch attendance history");
   },
+
+  async getAll(params = {}) {
+    return serviceRequest(async () => {
+      const response = await axiosInstance.get("/attendance/all", { params });
+      return response.data;
+    }, "Failed to fetch all attendance");
+  },
 };

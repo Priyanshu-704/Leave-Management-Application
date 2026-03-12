@@ -21,16 +21,23 @@ import {
   FaMoneyBillWave,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
-import { leaveService } from "@/services/api";
+import { leaveService, userService } from "@/services/api";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
+import { useAuth } from "@/context/AuthContext";
 
 const LeaveHistory = () => {
+  const { user } = useAuth();
+  const canViewAllLeaves = ["manager", "admin", "super_admin"].includes(
+    user?.role,
+  );
   const [leaves, setLeaves] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     status: "all",
     leaveType: "all",
+    employeeId: "all",
     search: "",
     dateFrom: "",
     dateTo: "",
@@ -43,11 +50,37 @@ const LeaveHistory = () => {
 
   useEffect(() => {
     fetchLeaves();
-  }, []);
+  }, [canViewAllLeaves]);
+
+  useEffect(() => {
+    if (!canViewAllLeaves) return;
+
+    const fetchEmployees = async () => {
+      try {
+        const response = await userService.getUsers({ limit: 500 });
+        const users = Array.isArray(response?.users)
+          ? response.users
+          : Array.isArray(response)
+            ? response
+            : [];
+        setEmployees(users);
+      } catch (error) {
+        console.error("Failed to fetch employees:", error);
+        toast.error("Failed to fetch employees");
+      }
+    };
+
+    fetchEmployees();
+  }, [canViewAllLeaves]);
 
   const fetchLeaves = async () => {
+    setLoading(true);
     try {
-      const response = await leaveService.getMyLeaves();
+      const response = await (
+        canViewAllLeaves
+          ? leaveService.getLeaves()
+          : leaveService.getMyLeaves()
+      );
       setLeaves(response);
     } catch (error) {
       toast.error(error, "Failed to fetch leave history");
@@ -96,8 +129,16 @@ const LeaveHistory = () => {
       const searchLower = debouncedSearch.toLowerCase();
       if (
         !leave.reason.toLowerCase().includes(searchLower) &&
-        !leave.leaveType.toLowerCase().includes(searchLower)
+        !leave.leaveType.toLowerCase().includes(searchLower) &&
+        !String(leave.employee?.name || "").toLowerCase().includes(searchLower) &&
+        !String(leave.employee?.employeeId || "").toLowerCase().includes(searchLower)
       ) {
+        return false;
+      }
+    }
+
+    if (canViewAllLeaves && filters.employeeId !== "all") {
+      if (String(leave.employee?._id || "") !== filters.employeeId) {
         return false;
       }
     }
@@ -213,7 +254,11 @@ const LeaveHistory = () => {
           <h2 className="text-lg font-semibold">Filters</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div
+          className={`grid grid-cols-1 gap-4 ${
+            canViewAllLeaves ? "md:grid-cols-3 lg:grid-cols-6" : "md:grid-cols-2 lg:grid-cols-5"
+          }`}
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
@@ -299,6 +344,27 @@ const LeaveHistory = () => {
               />
             </div>
           </div>
+          {canViewAllLeaves && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Employee
+              </label>
+              <Select
+                value={filters.employeeId}
+                onChange={(e) =>
+                  setFilters({ ...filters, employeeId: e.target.value })
+                }
+                className="input-field"
+              >
+                <Option value="all">All Employees</Option>
+                {employees.map((employee) => (
+                  <Option key={employee._id} value={employee._id}>
+                    {employee.name} ({employee.employeeId || "N/A"})
+                  </Option>
+                ))}
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -308,6 +374,11 @@ const LeaveHistory = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {canViewAllLeaves && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Employee
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Leave Details
                 </th>
@@ -331,6 +402,19 @@ const LeaveHistory = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredLeaves.map((leave) => (
                 <tr key={leave._id} className="hover:bg-gray-50">
+                  {canViewAllLeaves && (
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">
+                        {leave.employee?.name || "--"}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {leave.employee?.employeeId || "N/A"}
+                        {leave.employee?.department
+                          ? ` • ${leave.employee.department}`
+                          : ""}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
@@ -432,6 +516,19 @@ const LeaveHistory = () => {
             </div>
 
             <div className="space-y-4">
+              {canViewAllLeaves && selectedLeave.employee && (
+                <div>
+                  <label className="text-sm text-gray-500">Employee</label>
+                  <p className="font-medium">{selectedLeave.employee.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {selectedLeave.employee.employeeId || "N/A"}
+                    {selectedLeave.employee.department
+                      ? ` • ${selectedLeave.employee.department}`
+                      : ""}
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-500">Leave Type</label>

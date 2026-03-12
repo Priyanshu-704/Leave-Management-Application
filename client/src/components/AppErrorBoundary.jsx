@@ -8,6 +8,12 @@ class AppErrorBoundary extends React.Component {
     this.state = { hasError: false };
   }
 
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false });
+    }
+  }
+
   static getDerivedStateFromError() {
     return { hasError: true };
   }
@@ -31,6 +37,12 @@ class AppErrorBoundary extends React.Component {
             </p>
             <Button
               className="mt-4 btn-primary"
+              onClick={() => this.setState({ hasError: false })}
+            >
+              Try Again
+            </Button>
+            <Button
+              className="mt-4 ml-3 btn-secondary"
               onClick={() => window.location.reload()}
             >
               Reload
