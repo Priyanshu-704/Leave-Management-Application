@@ -264,7 +264,7 @@ const Layout = () => {
         if (!mounted) return;
         setNotifications(response.notifications || []);
         setUnreadCount(response.unreadCount || 0);
-      } catch (error) {
+      } catch {
         // Notification failures should not block layout.
       }
     };
@@ -385,7 +385,7 @@ const Layout = () => {
       </div>
 
       {/* Main content */}
-      <div className={`${desktopSidebarOpen ? "lg:pl-64" : "lg:pl-0"} flex flex-col flex-1`}>
+      <div className={`${desktopSidebarOpen ? "lg:pl-64" : "lg:pl-0"} flex min-w-0 flex-col flex-1`}>
         {/* Top navigation */}
         <nav className={`bg-white shadow-sm h-16 fixed top-0 right-0 left-0 ${desktopSidebarOpen ? "lg:left-64" : "lg:left-0"} z-10`}>
           <div className="px-4 sm:px-6 lg:px-8 h-full">
@@ -407,10 +407,10 @@ const Layout = () => {
                 </Button>
               </div>
 
-              <div className="flex-1" />
+              <div className="min-w-0 flex-1" />
 
               {/* Right side items */}
-              <div className="flex items-center space-x-4">
+              <div className="ml-3 flex items-center gap-2 sm:gap-4">
                 {/* Notifications */}
                 <div className="relative">
                   <Button
@@ -468,13 +468,13 @@ const Layout = () => {
                 <div className="relative">
                   <Button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    className="flex items-center space-x-3 text-sm focus:outline-none"
+                    className="flex items-center text-sm focus:outline-none"
                   >
-                    <div className="flex items-center space-x-3">
-                      <span className="hidden md:block text-gray-700">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <span className="hidden lg:block max-w-40 truncate text-gray-700">
                         {user?.name}
                       </span>
-                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold">
                         {user?.name?.charAt(0).toUpperCase()}
                       </div>
                     </div>

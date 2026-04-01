@@ -130,9 +130,9 @@ const AssignEmployeesModal = ({ shift, onClose, onSuccess }) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-6 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+      <div className="relative my-6 mx-auto w-full max-w-3xl rounded-xl border bg-white p-4 shadow-lg sm:p-5">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold flex items-center">
             <FaUsers className="mr-2 text-primary-600" />
             Assign Employees to {shift.name}
@@ -144,7 +144,7 @@ const AssignEmployeesModal = ({ shift, onClose, onSuccess }) => {
 
         {/* Shift Info */}
         <div className="bg-blue-50 p-3 rounded-lg mb-4">
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3 sm:gap-4">
             <div>
               <span className="text-blue-600">Shift:</span>
               <span className="ml-2 font-medium">{shift.name} ({shift.code})</span>
@@ -161,7 +161,7 @@ const AssignEmployeesModal = ({ shift, onClose, onSuccess }) => {
         </div>
 
         {/* Assignment Details */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className="form-label">Start Date</label>
             <div className="relative">
@@ -242,7 +242,7 @@ const AssignEmployeesModal = ({ shift, onClose, onSuccess }) => {
             {filteredEmployees.map(emp => (
               <div
                 key={emp._id}
-                className="flex items-center justify-between p-3 hover:bg-gray-50 border-b last:border-b-0"
+                className="flex flex-col gap-3 border-b p-3 hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between last:border-b-0"
               >
                 <div className="flex items-center space-x-3">
                   <Input
@@ -256,7 +256,7 @@ const AssignEmployeesModal = ({ shift, onClose, onSuccess }) => {
                     <p className="text-sm text-gray-500">{emp.email} • {emp.employeeId}</p>
                   </div>
                 </div>
-                <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                <span className="w-fit rounded-full bg-gray-100 px-2 py-1 text-xs">
                   {emp.department}
                 </span>
               </div>
@@ -271,18 +271,18 @@ const AssignEmployeesModal = ({ shift, onClose, onSuccess }) => {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 mt-6">
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button
             type="button"
             onClick={onClose}
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={loading || selectedEmployees.length === 0}
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto"
           >
             {loading ? 'Assigning...' : `Assign to ${selectedEmployees.length} Employees`}
           </Button>

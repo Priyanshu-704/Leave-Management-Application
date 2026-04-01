@@ -230,8 +230,8 @@ const DepartmentAnalytics = () => {
       {/* Detailed Table */}
       <div className="card">
         <h3 className="text-lg font-semibold mb-4">Detailed Department Metrics</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
+        <div className="responsive-table-shell">
+          <table className="responsive-data-table min-w-full">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-3 px-4">Department</th>
@@ -249,16 +249,16 @@ const DepartmentAnalytics = () => {
             <tbody>
               {analytics.map((dept) => (
                 <tr key={dept._id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium">{dept.name}</td>
-                  <td className="py-3 px-4">{dept.code}</td>
-                  <td className="py-3 px-4 text-right">{dept.employeeCount || 0}</td>
-                  <td className="py-3 px-4 text-right">{dept.activeEmployees || 0}</td>
-                  <td className="py-3 px-4 text-right">{dept.managerCount || 0}</td>
-                  <td className="py-3 px-4 text-right">{dept.totalLeaves || 0}</td>
-                  <td className="py-3 px-4 text-right">{dept.approvedLeaves || 0}</td>
-                  <td className="py-3 px-4 text-right">{dept.pendingLeaves || 0}</td>
-                  <td className="py-3 px-4 text-right">{dept.totalLeaveDays || 0}</td>
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3 px-4 font-medium" data-label="Department">{dept.name}</td>
+                  <td className="py-3 px-4" data-label="Code">{dept.code}</td>
+                  <td className="py-3 px-4 text-right" data-label="Total Emp">{dept.employeeCount || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Active Emp">{dept.activeEmployees || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Managers">{dept.managerCount || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Total Leaves">{dept.totalLeaves || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Approved">{dept.approvedLeaves || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Pending">{dept.pendingLeaves || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Total Days">{dept.totalLeaveDays || 0}</td>
+                  <td className="py-3 px-4 text-right" data-label="Avg Days/Emp">
                     {dept.employeeCount > 0 
                       ? ((dept.totalLeaveDays || 0) / dept.employeeCount).toFixed(1)
                       : 0}

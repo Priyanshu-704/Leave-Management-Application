@@ -13,7 +13,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, selectedUser }) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+      <div className="relative my-6 mx-auto w-full max-w-md rounded-xl border bg-white p-4 shadow-lg sm:p-5">
         <div className="text-center">
           <FaTrash className="mx-auto h-12 w-12 text-red-500" />
           <h3 className="text-lg font-semibold mt-2">Delete User</h3>
@@ -23,16 +23,16 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, selectedUser }) => {
           </p>
         </div>
 
-        <div className="flex justify-center space-x-3 mt-6">
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
           <Button
             onClick={onClose}
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={onConfirm}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            className="w-full rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 sm:w-auto"
           >
             Delete
           </Button>

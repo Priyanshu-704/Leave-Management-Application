@@ -160,8 +160,8 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
+        <div className="responsive-table-shell">
+          <table className="responsive-data-table min-w-full">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-3 px-4">Leave Type</th>
@@ -174,20 +174,20 @@ const Dashboard = () => {
             <tbody>
               {recentLeaves.map((leave) => (
                 <tr key={leave._id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 capitalize">{leave.leaveType}</td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 capitalize" data-label="Leave Type">{leave.leaveType}</td>
+                  <td className="py-3 px-4" data-label="Duration">
                     {format(new Date(leave.startDate), "MMM dd")} -{" "}
                     {format(new Date(leave.endDate), "MMM dd, yyyy")}
                   </td>
-                  <td className="py-3 px-4">{leave.days}</td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4" data-label="Days">{leave.days}</td>
+                  <td className="py-3 px-4" data-label="Status">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(leave.status)}`}
                     >
                       {leave.status}
                     </span>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4" data-label="Applied On">
                     {format(new Date(leave.appliedOn), "MMM dd, yyyy")}
                   </td>
                 </tr>

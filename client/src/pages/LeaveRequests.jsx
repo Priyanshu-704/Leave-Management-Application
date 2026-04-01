@@ -118,12 +118,17 @@ const LeaveRequests = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Leave Requests</h1>
-        <div className="flex space-x-2">
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1 className="page-title">Leave Requests</h1>
+          <p className="page-subtitle">
+            Approve or reject team leave quickly with cleaner mobile spacing, readable filters, and compact action rows.
+          </p>
+        </div>
+        <div className="page-header-actions">
           <Button
             onClick={() => fetchRequests()}
-            className="btn-secondary"
+            className="btn-secondary w-full justify-center sm:w-auto"
           >
             Refresh
           </Button>
@@ -137,7 +142,7 @@ const LeaveRequests = () => {
           <h2 className="text-lg font-semibold">Filter Requests</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
@@ -193,12 +198,12 @@ const LeaveRequests = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card bg-yellow-50 border-yellow-200">
+      <div className="stats-grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="stat-card bg-yellow-50 border-yellow-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-yellow-600 text-sm">Pending</p>
-              <p className="text-2xl font-bold text-yellow-700">
+              <p className="stat-label text-yellow-600">Pending</p>
+              <p className="stat-value text-yellow-700">
                 {requests.filter(r => r.status === 'pending').length}
               </p>
             </div>
@@ -206,11 +211,11 @@ const LeaveRequests = () => {
           </div>
         </div>
 
-        <div className="card bg-green-50 border-green-200">
+        <div className="stat-card bg-green-50 border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-600 text-sm">Approved</p>
-              <p className="text-2xl font-bold text-green-700">
+              <p className="stat-label text-green-600">Approved</p>
+              <p className="stat-value text-green-700">
                 {requests.filter(r => r.status === 'approved').length}
               </p>
             </div>
@@ -218,11 +223,11 @@ const LeaveRequests = () => {
           </div>
         </div>
 
-        <div className="card bg-red-50 border-red-200">
+        <div className="stat-card bg-red-50 border-red-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-red-600 text-sm">Rejected</p>
-              <p className="text-2xl font-bold text-red-700">
+              <p className="stat-label text-red-600">Rejected</p>
+              <p className="stat-value text-red-700">
                 {requests.filter(r => r.status === 'rejected').length}
               </p>
             </div>
@@ -230,11 +235,11 @@ const LeaveRequests = () => {
           </div>
         </div>
 
-        <div className="card bg-blue-50 border-blue-200">
+        <div className="stat-card bg-blue-50 border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-600 text-sm">Total Days</p>
-              <p className="text-2xl font-bold text-blue-700">
+              <p className="stat-label text-blue-600">Total Days</p>
+              <p className="stat-value text-blue-700">
                 {requests.reduce((acc, r) => acc + (r.days || 0), 0)}
               </p>
             </div>
@@ -245,8 +250,8 @@ const LeaveRequests = () => {
 
       {/* Requests List */}
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="responsive-table-shell">
+          <table className="responsive-data-table min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -275,10 +280,10 @@ const LeaveRequests = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredRequests.map((request) => (
                 <tr key={request._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Employee">
                     <div className="flex items-center">
                       <FaUserCircle className="h-8 w-8 text-gray-400" />
-                      <div className="ml-3">
+                      <div className="ml-3 min-w-0">
                         <div className="text-sm font-medium text-gray-900">
                           {request.employee?.name || 'N/A'}
                         </div>
@@ -288,33 +293,33 @@ const LeaveRequests = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Leave Details">
                     <div className="text-sm font-medium text-gray-900 capitalize">
                       {request.leaveType} Leave
                     </div>
-                    <div className="text-sm text-gray-500 truncate max-w-xs">
+                    <div className="max-w-xs text-sm text-gray-500 sm:truncate">
                       {request.reason}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Duration">
                     <div className="text-sm text-gray-900">
                       {request.startDate ? format(new Date(request.startDate), 'MMM dd') : 'N/A'} - {request.endDate ? format(new Date(request.endDate), 'MMM dd, yyyy') : 'N/A'}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Days">
                     <span className="text-sm font-medium text-gray-900">
                       {request.days} {request.days === 1 ? 'day' : 'days'}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Status">
                     {getStatusBadge(request.status)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-6 py-4 text-sm text-gray-500" data-label="Applied">
                     {request.appliedOn ? format(new Date(request.appliedOn), 'MMM dd, yyyy') : 'N/A'}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Actions" data-cell="actions">
                     {request.status === 'pending' && (
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Button
                           onClick={() => {
                             setSelectedRequest(request);
@@ -380,7 +385,7 @@ const LeaveRequests = () => {
             }
           }}
         >
-          <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+          <div className="relative my-6 mx-auto w-full max-w-md rounded-xl border bg-white p-4 shadow-lg sm:p-5">
             <div className="mb-4">
               <h3 className="text-lg font-semibold">
                 {actionData.status ? `${actionData.status === 'approved' ? 'Approve' : 'Reject'} Leave Request` : 'Request Details'}
@@ -421,20 +426,20 @@ const LeaveRequests = () => {
                 </div>
               )}
 
-              <div className="flex justify-end space-x-3 mt-6">
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <Button
                   onClick={() => {
                     setShowActionModal(false);
                     setActionData({ status: '', comments: '' });
                   }}
-                  className="btn-secondary"
+                  className="btn-secondary w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
                 {actionData.status && (
                   <Button
                     onClick={handleAction}
-                    className={`btn-primary ${
+                    className={`btn-primary w-full sm:w-auto ${
                       actionData.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
                     }`}
                   >

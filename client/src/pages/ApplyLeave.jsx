@@ -64,7 +64,7 @@ const ApplyLeave = () => {
 
   return (
     <div className="fixed inset-0 z-40 bg-white/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+      <div className="mx-auto w-full max-w-3xl rounded-xl border border-gray-200 bg-white p-4 shadow-xl sm:p-6">
         <div className="mb-4 flex justify-end">
           <Button
             type="button"
@@ -75,10 +75,13 @@ const ApplyLeave = () => {
             <FaTimes />
           </Button>
         </div>
-        <h1 className="text-2xl font-bold mb-6">Apply for Leave</h1>
+        <h1 className="page-title mb-2">Apply for Leave</h1>
+        <p className="page-subtitle mb-6">
+          Submit a leave request with a layout that stays fully visible and easy to use on smaller screens.
+        </p>
         
         {/* Leave Balance Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="mb-6 grid grid-cols-1 gap-3 rounded-lg bg-gray-50 p-4 sm:grid-cols-3 sm:gap-4">
           <div>
             <span className="text-sm text-gray-600">Annual Leave</span>
             <p className="text-xl font-semibold text-blue-600">
@@ -105,7 +108,7 @@ const ApplyLeave = () => {
             <label className="required-label block text-sm font-medium text-gray-700 mb-2">
               Leave Type
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
               {leaveTypes.map((type) => (
                 <Button
                   key={type.value}
@@ -189,18 +192,18 @@ const ApplyLeave = () => {
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
               type="button"
               onClick={() => navigate(-1)}
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="btn-primary disabled:opacity-50"
+              className="btn-primary w-full disabled:opacity-50 sm:w-auto"
             >
               {loading ? 'Submitting...' : 'Submit Application'}
             </Button>

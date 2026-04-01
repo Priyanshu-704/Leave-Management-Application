@@ -476,8 +476,8 @@ const Departments = () => {
             }
           }}
         >
-          <div className="relative my-6 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
-            <div className="flex justify-between items-center mb-4">
+          <div className="relative my-6 mx-auto w-full max-w-3xl rounded-xl border bg-white p-4 shadow-lg sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold">
                 {editingDept ? 'Edit Department' : 'Add New Department'}
               </h3>
@@ -496,7 +496,7 @@ const Departments = () => {
               {/* Basic Information */}
               <div>
                 <h4 className="font-medium mb-3">Basic Information</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="form-label">Department Name *</label>
                     <Input
@@ -521,7 +521,7 @@ const Departments = () => {
                       style={{ textTransform: 'uppercase' }}
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="md:col-span-2">
                     <label className="form-label">Description</label>
                     <textarea
                       name="description"
@@ -538,7 +538,7 @@ const Departments = () => {
               {/* Location */}
               <div>
                 <h4 className="font-medium mb-3">Location</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label className="form-label">Building</label>
                     <Input
@@ -575,7 +575,7 @@ const Departments = () => {
               {/* Contact Information */}
               <div>
                 <h4 className="font-medium mb-3">Contact Information</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label className="form-label">Email</label>
                     <Input
@@ -612,7 +612,7 @@ const Departments = () => {
               {/* Leave Settings */}
               <div>
                 <h4 className="font-medium mb-3">Default Leave Quota</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label className="form-label">Annual Leave</label>
                     <Input
@@ -650,20 +650,20 @@ const Departments = () => {
               </div>
 
               {/* Form Actions */}
-              <div className="flex justify-end space-x-3">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <Button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
                     resetForm();
                   }}
-                  className="btn-secondary"
+                  className="btn-secondary w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  className="btn-primary"
+                  className="btn-primary w-full sm:w-auto"
                 >
                   {editingDept ? 'Update Department' : 'Create Department'}
                 </Button>

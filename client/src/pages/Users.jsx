@@ -299,37 +299,44 @@ const Users = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-        <Button
-          onClick={() => {
-            resetForm();
-            setShowUserModal(true);
-          }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <FaUserPlus />
-          <span>Add New User</span>
-        </Button>
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1 className="page-title">User Management</h1>
+          <p className="page-subtitle">
+            Manage employees, roles, permissions, and account status with cleaner spacing across phone and desktop layouts.
+          </p>
+        </div>
+        <div className="page-header-actions">
+          <Button
+            onClick={() => {
+              resetForm();
+              setShowUserModal(true);
+            }}
+            className="btn-primary inline-flex w-full items-center justify-center space-x-2 sm:w-auto"
+          >
+            <FaUserPlus />
+            <span>Add New User</span>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card bg-blue-50 border-blue-200">
+      <div className="stats-grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="stat-card bg-blue-50 border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-600 text-sm">Total Users</p>
-              <p className="text-2xl font-bold text-blue-700">{users.length}</p>
+              <p className="stat-label text-blue-600">Total Users</p>
+              <p className="stat-value text-blue-700">{users.length}</p>
             </div>
             <FaUserCircle className="text-blue-500 text-3xl" />
           </div>
         </div>
 
-        <div className="card bg-green-50 border-green-200">
+        <div className="stat-card bg-green-50 border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-600 text-sm">Active Users</p>
-              <p className="text-2xl font-bold text-green-700">
+              <p className="stat-label text-green-600">Active Users</p>
+              <p className="stat-value text-green-700">
                 {users.filter((u) => u.isActive).length}
               </p>
             </div>
@@ -337,11 +344,11 @@ const Users = () => {
           </div>
         </div>
 
-        <div className="card bg-yellow-50 border-yellow-200">
+        <div className="stat-card bg-yellow-50 border-yellow-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-yellow-600 text-sm">Managers</p>
-              <p className="text-2xl font-bold text-yellow-700">
+              <p className="stat-label text-yellow-600">Managers</p>
+              <p className="stat-value text-yellow-700">
                 {users.filter((u) => u.role === "manager").length}
               </p>
             </div>
@@ -349,11 +356,11 @@ const Users = () => {
           </div>
         </div>
 
-        <div className="card bg-purple-50 border-purple-200">
+        <div className="stat-card bg-purple-50 border-purple-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-600 text-sm">Admins</p>
-              <p className="text-2xl font-bold text-purple-700">
+              <p className="stat-label text-purple-600">Admins</p>
+              <p className="stat-value text-purple-700">
                 {users.filter((u) => u.role === "admin").length}
               </p>
             </div>
@@ -369,7 +376,7 @@ const Users = () => {
           <h2 className="text-lg font-semibold">Filters</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Role
@@ -449,8 +456,8 @@ const Users = () => {
 
       {/* Users Table */}
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="responsive-table-shell">
+          <table className="responsive-data-table min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -479,10 +486,10 @@ const Users = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {users.map((user) => (
                 <tr key={user._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="User">
                     <div className="flex items-center">
                       <FaUserCircle className="h-8 w-8 text-gray-400" />
-                      <div className="ml-3">
+                      <div className="ml-3 min-w-0">
                         <div className="text-sm font-medium text-gray-900">
                           {user.name}
                         </div>
@@ -492,20 +499,20 @@ const Users = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-6 py-4 text-sm text-gray-500" data-label="Employee ID">
                     {user.employeeId}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-6 py-4 text-sm text-gray-500" data-label="Department">
                     {user.department}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Role">
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${getRoleBadgeColor(user.role)}`}
                     >
                       {user.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Leave Balance">
                     <div className="text-xs space-y-1">
                       <div className="flex justify-between">
                         <span>Annual:</span>
@@ -527,7 +534,7 @@ const Users = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Status">
                     {user.isActive ? (
                       <span className="flex items-center text-green-600 bg-green-100 px-2 py-1 rounded-full text-xs w-fit">
                         <FaCheckCircle className="mr-1" /> Active
@@ -538,8 +545,8 @@ const Users = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex space-x-2">
+                  <td className="px-6 py-4" data-label="Actions" data-cell="actions">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         onClick={() => openEditModal(user)}
                         className="text-blue-600 hover:text-blue-900 bg-blue-100 p-2 rounded-full"

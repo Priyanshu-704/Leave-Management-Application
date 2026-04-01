@@ -184,19 +184,24 @@ const AttendanceHistory = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Attendance History</h1>
-        <div className="flex space-x-3">
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1 className="page-title">Attendance History</h1>
+          <p className="page-subtitle">
+            Track attendance trends, inspect check-in details, and review work-hour records with a cleaner mobile layout.
+          </p>
+        </div>
+        <div className="page-header-actions">
           <Button
             onClick={() => {/* Export PDF */}}
-            className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="flex w-full items-center justify-center space-x-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 sm:w-auto"
           >
             <FaFilePdf />
             <span>PDF</span>
           </Button>
           <Button
             onClick={() => {/* Export Excel */}}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="flex w-full items-center justify-center space-x-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 sm:w-auto"
           >
             <FaFileExcel />
             <span>Excel</span>
@@ -206,26 +211,26 @@ const AttendanceHistory = () => {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="card bg-blue-50">
-            <p className="text-sm text-blue-600">Total Days</p>
-            <p className="text-2xl font-bold text-blue-700">{summary.totalDays || 0}</p>
+        <div className="stats-grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="stat-card bg-blue-50 border-blue-200">
+            <p className="stat-label text-blue-600">Total Days</p>
+            <p className="stat-value text-blue-700">{summary.totalDays || 0}</p>
           </div>
-          <div className="card bg-green-50">
-            <p className="text-sm text-green-600">Present</p>
-            <p className="text-2xl font-bold text-green-700">{summary.presentDays || 0}</p>
+          <div className="stat-card bg-green-50 border-green-200">
+            <p className="stat-label text-green-600">Present</p>
+            <p className="stat-value text-green-700">{summary.presentDays || 0}</p>
           </div>
-          <div className="card bg-yellow-50">
-            <p className="text-sm text-yellow-600">Late</p>
-            <p className="text-2xl font-bold text-yellow-700">{summary.lateDays || 0}</p>
+          <div className="stat-card bg-yellow-50 border-yellow-200">
+            <p className="stat-label text-yellow-600">Late</p>
+            <p className="stat-value text-yellow-700">{summary.lateDays || 0}</p>
           </div>
-          <div className="card bg-red-50">
-            <p className="text-sm text-red-600">Absent</p>
-            <p className="text-2xl font-bold text-red-700">{summary.absentDays || 0}</p>
+          <div className="stat-card bg-red-50 border-red-200">
+            <p className="stat-label text-red-600">Absent</p>
+            <p className="stat-value text-red-700">{summary.absentDays || 0}</p>
           </div>
-          <div className="card bg-purple-50">
-            <p className="text-sm text-purple-600">Total Hours</p>
-            <p className="text-2xl font-bold text-purple-700">
+          <div className="stat-card bg-purple-50 border-purple-200">
+            <p className="stat-label text-purple-600">Total Hours</p>
+            <p className="stat-value text-purple-700">
               {summary.totalWorkHours?.toFixed(1) || 0}
             </p>
           </div>
@@ -239,7 +244,7 @@ const AttendanceHistory = () => {
           <h2 className="text-lg font-semibold">Filters</h2>
         </div>
 
-        <div className={`grid grid-cols-1 gap-4 ${canViewAllAttendance ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+        <div className={`grid grid-cols-1 gap-4 md:gap-5 ${canViewAllAttendance ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <div>
             <label className="form-label">From Date</label>
             <Input
@@ -292,8 +297,8 @@ const AttendanceHistory = () => {
 
       {/* Attendance Table */}
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
+        <div className="responsive-table-shell">
+          <table className="responsive-data-table min-w-full">
             <thead className="bg-gray-50">
               <tr>
                 {canViewAllAttendance && (
@@ -312,20 +317,20 @@ const AttendanceHistory = () => {
               {filteredAttendance.map((record) => (
                 <tr key={record._id} className="hover:bg-gray-50">
                   {canViewAllAttendance && (
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" data-label="Employee">
                       <div className="font-medium text-gray-900">{record.employee?.name || '--'}</div>
                       <div className="text-xs text-gray-500">
                         {record.employee?.employeeId || 'N/A'}{record.employee?.department ? ` • ${record.employee.department}` : ''}
                       </div>
                     </td>
                   )}
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Date">
                     {format(new Date(record.date), 'MMM dd, yyyy')}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Day">
                     {format(new Date(record.date), 'EEEE')}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Check In">
                     {record.checkIn?.time ? (
                       <div>
                         <span className="font-medium">
@@ -339,14 +344,14 @@ const AttendanceHistory = () => {
                       </div>
                     ) : '--'}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Check Out">
                     {record.checkOut?.time ? 
                       format(new Date(record.checkOut.time), 'hh:mm:ss a') : '--'}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Hours">
                     {record.workHours ? record.workHours.toFixed(2) : '0.00'} hrs
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Status">
                     <span className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs w-fit ${getStatusColor(record.status, record.isLate)}`}>
                       {getStatusIcon(record.status, record.isLate)}
                       <span className="capitalize">
@@ -354,7 +359,7 @@ const AttendanceHistory = () => {
                       </span>
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Actions" data-cell="actions">
                     <Button
                       onClick={() => setSelectedAttendance(record)}
                       className="text-primary-600 hover:text-primary-800"

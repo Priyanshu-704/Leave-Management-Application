@@ -23,9 +23,11 @@ const triggerDownload = (response, fallbackName) => {
 
 const Section = ({ title, children, actions }) => (
   <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-    <div className="flex items-start justify-between gap-3">
-      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-      {actions}
+    <div className="page-header">
+      <div className="page-header-title">
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      </div>
+      {actions ? <div className="page-header-actions">{actions}</div> : null}
     </div>
     {children}
   </div>
@@ -54,8 +56,8 @@ const Dialog = ({ isOpen, title, onClose, children }) => {
 };
 
 const DataTable = ({ columns, rows }) => (
-  <div className="overflow-x-auto rounded-lg border border-gray-200">
-    <table className="min-w-full text-sm">
+  <div className="responsive-table-shell rounded-lg border border-gray-200">
+    <table className="responsive-data-table min-w-full text-sm">
       <thead className="bg-gray-50 text-gray-700">
         <tr>
           {columns.map((col) => (
@@ -67,7 +69,11 @@ const DataTable = ({ columns, rows }) => (
         {rows.length ? rows.map((row, index) => (
           <tr key={row._id || index} className="border-t border-gray-100">
             {columns.map((col) => (
-              <td key={`${row._id || index}-${col.key}`} className="px-3 py-2 text-gray-700">
+              <td
+                key={`${row._id || index}-${col.key}`}
+                className="px-3 py-2 text-gray-700"
+                data-label={col.label}
+              >
                 {col.render ? col.render(row[col.key], row) : row[col.key] ?? "-"}
               </td>
             ))}

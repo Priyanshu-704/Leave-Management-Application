@@ -107,8 +107,8 @@ const CreateAnnouncementModal = ({ onClose, onSuccess, announcementToEdit = null
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-6 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
-        <div className="flex justify-between items-center mb-4">
+      <div className="relative my-6 mx-auto w-full max-w-3xl rounded-xl border bg-white p-4 shadow-lg sm:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold flex items-center">
             <FaBullhorn className="mr-2 text-primary-600" />
             {announcementToEdit ? 'Edit Announcement' : 'Create New Announcement'}
@@ -148,7 +148,7 @@ const CreateAnnouncementModal = ({ onClose, onSuccess, announcementToEdit = null
           </div>
 
           {/* Type and Priority */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="form-label">Type</label>
               <Select
@@ -223,7 +223,7 @@ const CreateAnnouncementModal = ({ onClose, onSuccess, announcementToEdit = null
           )}
 
           {/* Expiry Date */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="form-label">Expiry Date</label>
               <Input
@@ -277,18 +277,18 @@ const CreateAnnouncementModal = ({ onClose, onSuccess, announcementToEdit = null
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end">
             <Button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={submitting}
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto"
             >
               {submitting
                 ? (announcementToEdit ? 'Updating...' : 'Creating...')

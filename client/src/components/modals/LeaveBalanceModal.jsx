@@ -24,8 +24,8 @@ const LeaveBalanceModal = ({ isOpen, onClose, onSubmit, formData, setFormData, s
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-6 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
-        <div className="flex justify-between items-center mb-4">
+      <div className="relative my-6 mx-auto w-full max-w-md rounded-xl border bg-white p-4 shadow-lg sm:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Update Leave Balance</h3>
           <Button
             onClick={onClose}
@@ -41,7 +41,7 @@ const LeaveBalanceModal = ({ isOpen, onClose, onSubmit, formData, setFormData, s
             <p className="text-sm text-gray-600">{selectedUser.email}</p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Annual
@@ -86,15 +86,15 @@ const LeaveBalanceModal = ({ isOpen, onClose, onSubmit, formData, setFormData, s
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" className="btn-primary">
+            <Button type="submit" className="btn-primary w-full sm:w-auto">
               Update Balance
             </Button>
           </div>

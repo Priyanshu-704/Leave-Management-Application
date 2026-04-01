@@ -320,8 +320,8 @@ const OrganizationChart = () => {
                   </div>
                 ) : (
                   // List View
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full">
+                  <div className="responsive-table-shell">
+                    <table className="responsive-data-table min-w-full">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -356,7 +356,7 @@ const OrganizationChart = () => {
                           })
                           .map((emp) => (
                             <tr key={emp._id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-3" data-label="Employee">
                                 <div className="flex items-center space-x-3">
                                   <FaUserCircle className="text-gray-400" />
                                   <span className="font-medium">
@@ -364,20 +364,20 @@ const OrganizationChart = () => {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-gray-600">
+                              <td className="px-4 py-3 text-gray-600" data-label="Employee ID">
                                 {emp.employeeId}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-3" data-label="Role">
                                 <span
                                   className={`px-2 py-1 text-xs rounded-full ${getRoleColor(emp.role)}`}
                                 >
                                   {getRoleIcon(emp.role)} {emp.role}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-gray-600">
+                              <td className="px-4 py-3 text-gray-600" data-label="Email">
                                 {emp.email}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-3" data-label="Actions" data-cell="actions">
                                 {(isAdmin || isManager) && (
                                   <Link
                                     to={`/users/${emp._id}`}

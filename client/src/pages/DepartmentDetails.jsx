@@ -406,8 +406,8 @@ const DepartmentDetails = () => {
         {activeTab === "employees" && (
           <div className="card">
             <h3 className="text-lg font-semibold mb-4">Department Employees</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
+            <div className="responsive-table-shell">
+              <table className="responsive-data-table min-w-full">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4">Employee</th>
@@ -420,7 +420,7 @@ const DepartmentDetails = () => {
                 <tbody>
                   {department.employees?.map((emp) => (
                     <tr key={emp._id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Employee">
                         <div className="flex items-center space-x-3">
                           <FaUserCircle className="text-gray-400 text-xl" />
                           <div>
@@ -429,8 +429,8 @@ const DepartmentDetails = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4">{emp.employeeId}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Employee ID">{emp.employeeId}</td>
+                      <td className="py-3 px-4" data-label="Role">
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded-full ${
                             emp.role === "admin"
@@ -443,14 +443,14 @@ const DepartmentDetails = () => {
                           {emp.role}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Leave Balance">
                         <div className="text-xs">
                           <div>A: {emp.leaveBalance?.annual || 0}</div>
                           <div>S: {emp.leaveBalance?.sick || 0}</div>
                           <div>P: {emp.leaveBalance?.personal || 0}</div>
                         </div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Status">
                         {emp.isActive ? (
                           <span className="flex items-center text-green-600">
                             <FaCheckCircle className="mr-1" /> Active
@@ -519,8 +519,8 @@ const DepartmentDetails = () => {
             <h3 className="text-lg font-semibold mb-4">
               Pending Leave Requests
             </h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
+            <div className="responsive-table-shell">
+              <table className="responsive-data-table min-w-full">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4">Employee</th>
@@ -534,24 +534,24 @@ const DepartmentDetails = () => {
                 <tbody>
                   {department.pendingApprovals?.map((leave) => (
                     <tr key={leave._id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Employee">
                         <div className="flex items-center">
                           <FaUserCircle className="mr-2 text-gray-400" />
                           <span>{leave.employee?.name}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 capitalize">
+                      <td className="py-3 px-4 capitalize" data-label="Leave Type">
                         {leave.leaveType}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Duration">
                         {format(new Date(leave.startDate), "MMM dd")} -{" "}
                         {format(new Date(leave.endDate), "MMM dd")}
                       </td>
-                      <td className="py-3 px-4">{leave.days}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Days">{leave.days}</td>
+                      <td className="py-3 px-4" data-label="Applied On">
                         {format(new Date(leave.appliedOn), "MMM dd, yyyy")}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" data-label="Actions" data-cell="actions">
                         <Link
                           to={`/leave-requests`}
                           className="text-primary-600 hover:underline"

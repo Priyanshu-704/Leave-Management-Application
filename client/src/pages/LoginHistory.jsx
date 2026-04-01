@@ -35,16 +35,18 @@ const LoginHistory = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Login History & Device Management</h1>
-          <p className="text-gray-600">One active session is allowed per user. New login will logout previous device.</p>
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1 className="page-title">Login History & Device Management</h1>
+          <p className="page-subtitle">One active session is allowed per user. New login will logout the previous device automatically.</p>
         </div>
-        <Button className="px-3 py-2 rounded-md border border-gray-300" onClick={load}>Refresh</Button>
+        <div className="page-header-actions">
+          <Button className="w-full rounded-md border border-gray-300 px-3 py-2 sm:w-auto" onClick={load}>Refresh</Button>
+        </div>
       </div>
 
-      <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
-        <table className="min-w-full text-sm">
+      <div className="responsive-table-shell rounded-lg border border-gray-200 bg-white">
+        <table className="responsive-data-table min-w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left px-3 py-2">Device</th>
@@ -59,11 +61,11 @@ const LoginHistory = () => {
               const isCurrent = row.sessionId === data.activeSessionId;
               return (
                 <tr key={row._id} className="border-t border-gray-100">
-                  <td className="px-3 py-2">{row.deviceName || "Unknown Device"}</td>
-                  <td className="px-3 py-2">{row.ipAddress || "-"}</td>
-                  <td className="px-3 py-2">{formatDateTime(row.loginAt)}</td>
-                  <td className="px-3 py-2">{formatDateTime(row.lastSeenAt)}</td>
-                  <td className="px-3 py-2">{isCurrent ? <span className="text-green-600 font-medium">Current</span> : <span className="text-gray-500">Logged out</span>}</td>
+                  <td className="px-3 py-2" data-label="Device">{row.deviceName || "Unknown Device"}</td>
+                  <td className="px-3 py-2" data-label="IP">{row.ipAddress || "-"}</td>
+                  <td className="px-3 py-2" data-label="Login At">{formatDateTime(row.loginAt)}</td>
+                  <td className="px-3 py-2" data-label="Last Seen">{formatDateTime(row.lastSeenAt)}</td>
+                  <td className="px-3 py-2" data-label="Status">{isCurrent ? <span className="text-green-600 font-medium">Current</span> : <span className="text-gray-500">Logged out</span>}</td>
                 </tr>
               );
             }) : (

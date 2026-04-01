@@ -181,7 +181,7 @@ const AttendanceCard = () => {
         Today's Attendance
       </h2>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">Check In</p>
           <p className="text-lg font-semibold text-green-600">
@@ -208,7 +208,7 @@ const AttendanceCard = () => {
           <div
             className={`rounded-lg p-4 ${isOnBreak ? "bg-gray-100" : "bg-blue-50"}`}
           >
-            <div className="flex items-center justify-between mb-1">
+            <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p
                 className={`text-sm font-medium ${isOnBreak ? "text-gray-600" : "text-blue-700"}`}
               >
@@ -235,7 +235,7 @@ const AttendanceCard = () => {
           {/* Break Timer - Only shown when on break */}
           {isOnBreak && (
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="flex items-center text-sm font-medium text-yellow-700">
                   <FaCoffee className="mr-2" /> Break duration
                 </p>
@@ -251,7 +251,7 @@ const AttendanceCard = () => {
 
           {/* Break Summary */}
           {totalBreakTime > 0 && (
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex flex-col gap-1 text-xs text-gray-500 sm:flex-row sm:justify-between">
               <span>Total break time today:</span>
               <span className="font-medium">{formatTime(totalBreakTime)}</span>
             </div>
@@ -271,11 +271,11 @@ const AttendanceCard = () => {
                   className="input-field"
                   rows="2"
                 />
-                <div className="flex space-x-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     onClick={handleCheckIn}
                     disabled={loading}
-                    className="flex-1 btn-primary flex items-center justify-center space-x-2"
+                    className="btn-primary flex-1 items-center justify-center space-x-2"
                   >
                     <FaSignInAlt />
                     <span>
@@ -284,7 +284,7 @@ const AttendanceCard = () => {
                   </Button>
                   <Button
                     onClick={() => setShowNoteInput(false)}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                   >
                     Cancel
                   </Button>
@@ -340,11 +340,11 @@ const AttendanceCard = () => {
                   className="input-field"
                   rows="2"
                 />
-                <div className="flex space-x-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     onClick={handleCheckOut}
                     disabled={loading}
-                    className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2"
+                    className="flex-1 items-center justify-center space-x-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
                   >
                     <FaSignOutAlt />
                     <span>
@@ -353,7 +353,7 @@ const AttendanceCard = () => {
                   </Button>
                   <Button
                     onClick={() => setShowNoteInput(false)}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                   >
                     Cancel
                   </Button>

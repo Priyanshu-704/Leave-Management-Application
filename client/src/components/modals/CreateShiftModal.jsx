@@ -166,9 +166,9 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-6 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-lg bg-white">
+      <div className="relative my-6 mx-auto w-full max-w-4xl rounded-xl border bg-white p-4 shadow-lg sm:p-5">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold flex items-center">
             {getShiftIcon(formData.type)}
             <span className="ml-2">{shiftToEdit ? 'Edit Shift' : 'Create New Shift'}</span>
@@ -179,8 +179,8 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b mb-4">
-          <nav className="flex space-x-8">
+        <div className="mb-4 border-b">
+          <nav className="flex flex-wrap gap-3 sm:gap-6">
             <Button
               onClick={() => setActiveTab('basic')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -232,7 +232,7 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
           {/* Basic Info Tab */}
           {activeTab === 'basic' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="form-label">Shift Name *</label>
                   <Input
@@ -414,7 +414,7 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="form-label">Base Rate (x)</label>
                   <Input
@@ -475,7 +475,7 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
               </div>
 
               <h3 className="font-medium mt-4">Fixed Allowances (₹ per shift)</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <label className="form-label">Shift Allowance</label>
                   <Input
@@ -525,8 +525,8 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
                 />
               </div>
 
-              <div className="max-h-96 overflow-y-auto border rounded-lg">
-                <table className="min-w-full">
+              <div className="responsive-table-shell max-h-96 overflow-y-auto rounded-lg border">
+                <table className="responsive-data-table min-w-full">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Select</th>
@@ -541,7 +541,7 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
                       .filter(emp => isAdmin || emp.department === formData.department)
                       .map(emp => (
                         <tr key={emp._id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2">
+                          <td className="px-4 py-2" data-label="Select">
                             <Input
                               type="checkbox"
                               checked={formData.assignedEmployees.includes(emp._id)}
@@ -549,15 +549,15 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
                               className="h-4 w-4 text-primary-600 rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-4 py-2" data-label="Employee">
                             <div>
                               <p className="font-medium">{emp.name}</p>
                               <p className="text-xs text-gray-500">{emp.email}</p>
                             </div>
                           </td>
-                          <td className="px-4 py-2 text-sm">{emp.employeeId}</td>
-                          <td className="px-4 py-2 text-sm">{emp.department}</td>
-                          <td className="px-4 py-2 text-sm">
+                          <td className="px-4 py-2 text-sm" data-label="ID">{emp.employeeId}</td>
+                          <td className="px-4 py-2 text-sm" data-label="Department">{emp.department}</td>
+                          <td className="px-4 py-2 text-sm" data-label="Current Shift">
                             {/* Show current shift if any */}
                             <span className="text-gray-400">Not assigned</span>
                           </td>
@@ -591,7 +591,7 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
 
               {formData.rotationEnabled && (
                 <div className="space-y-4 pl-6">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="form-label">Rotation Frequency</label>
                       <Select
@@ -634,18 +634,18 @@ const CreateShiftModal = ({ onClose, onSuccess, shiftToEdit = null }) => {
           )}
 
           {/* Form Actions */}
-          <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+          <div className="mt-6 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
             <Button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto"
             >
               {loading ? 'Saving...' : shiftToEdit ? 'Update Shift' : 'Create Shift'}
             </Button>

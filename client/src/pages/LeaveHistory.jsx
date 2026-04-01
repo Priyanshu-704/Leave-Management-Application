@@ -225,13 +225,18 @@ const LeaveHistory = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Leave History</h1>
-        <div className="flex space-x-3">
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1 className="page-title">Leave History</h1>
+          <p className="page-subtitle">
+            Review leave applications, filter by status or employee, and export clean records from any device.
+          </p>
+        </div>
+        <div className="page-header-actions">
           <Button
             onClick={() => downloadExport("pdf")}
             disabled={exporting === "pdf"}
-            className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="flex w-full items-center justify-center space-x-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 sm:w-auto"
           >
             <FaFilePdf />
             <span>{exporting === "pdf" ? "Exporting..." : "PDF"}</span>
@@ -239,7 +244,7 @@ const LeaveHistory = () => {
           <Button
             onClick={() => downloadExport("excel")}
             disabled={exporting === "excel"}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="flex w-full items-center justify-center space-x-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 sm:w-auto"
           >
             <FaFileExcel />
             <span>{exporting === "excel" ? "Exporting..." : "Excel"}</span>
@@ -255,7 +260,7 @@ const LeaveHistory = () => {
         </div>
 
         <div
-          className={`grid grid-cols-1 gap-4 ${
+          className={`grid grid-cols-1 gap-4 md:gap-5 ${
             canViewAllLeaves ? "md:grid-cols-3 lg:grid-cols-6" : "md:grid-cols-2 lg:grid-cols-5"
           }`}
         >
@@ -370,8 +375,8 @@ const LeaveHistory = () => {
 
       {/* Leave List */}
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="responsive-table-shell">
+          <table className="responsive-data-table min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 {canViewAllLeaves && (
@@ -403,7 +408,7 @@ const LeaveHistory = () => {
               {filteredLeaves.map((leave) => (
                 <tr key={leave._id} className="hover:bg-gray-50">
                   {canViewAllLeaves && (
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" data-label="Employee">
                       <div className="text-sm font-medium text-gray-900">
                         {leave.employee?.name || "--"}
                       </div>
@@ -415,7 +420,7 @@ const LeaveHistory = () => {
                       </div>
                     </td>
                   )}
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Leave Details">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
                         <span className="text-lg">
@@ -425,17 +430,17 @@ const LeaveHistory = () => {
                           {leave.leaveType === "unpaid" && <FaMoneyBillWave />}
                         </span>
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-4 min-w-0">
                         <div className="text-sm font-medium text-gray-900 capitalize">
                           {leave.leaveType} Leave
                         </div>
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
+                        <div className="max-w-xs text-sm text-gray-500 sm:truncate">
                           {leave.reason}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Duration">
                     <div className="text-sm text-gray-900">
                       {format(new Date(leave.startDate), "MMM dd, yyyy")}
                     </div>
@@ -443,28 +448,28 @@ const LeaveHistory = () => {
                       to {format(new Date(leave.endDate), "MMM dd, yyyy")}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Days">
                     <span className="text-sm font-medium text-gray-900">
                       {leave.days} {leave.days === 1 ? "day" : "days"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" data-label="Status">
                     <span
                       className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(leave.status)}`}
                     >
                       {getStatusIcon(leave.status)} {leave.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-6 py-4 text-sm text-gray-500" data-label="Applied On">
                     {format(new Date(leave.appliedOn), "MMM dd, yyyy")}
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium">
+                  <td className="px-6 py-4 text-sm font-medium" data-label="Actions" data-cell="actions">
                     <Button
                       onClick={() => {
                         setSelectedLeave(leave);
                         setShowDetails(true);
                       }}
-                      className="text-primary-600 hover:text-primary-900 mr-3"
+                      className="mr-3 text-primary-600 hover:text-primary-900"
                     >
                       <FaEye />
                     </Button>
@@ -504,7 +509,7 @@ const LeaveHistory = () => {
             if (e.target === e.currentTarget) setShowDetails(false);
           }}
         >
-          <div className="relative my-6 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+          <div className="relative my-6 mx-auto w-full max-w-2xl rounded-xl border bg-white p-4 shadow-lg sm:p-5">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Leave Request Details</h3>
               <Button
@@ -529,7 +534,7 @@ const LeaveHistory = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="text-sm text-gray-500">Leave Type</label>
                   <p className="font-medium capitalize">

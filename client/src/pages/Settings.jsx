@@ -1564,8 +1564,8 @@ const Settings = () => {
             <div className="space-y-6">
               <h2 className="text-xl font-semibold">Audit Log</h2>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
+              <div className="responsive-table-shell">
+                <table className="responsive-data-table min-w-full">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
@@ -1591,22 +1591,22 @@ const Settings = () => {
                   <tbody className="divide-y divide-gray-200">
                     {auditLog.map((entry, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm">{entry.action}</td>
-                        <td className="px-4 py-2 text-sm">{entry.field}</td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
+                        <td className="px-4 py-2 text-sm" data-label="Action">{entry.action}</td>
+                        <td className="px-4 py-2 text-sm" data-label="Field">{entry.field}</td>
+                        <td className="px-4 py-2 text-sm text-gray-600" data-label="Old Value">
                           {typeof entry.oldValue === "object"
                             ? JSON.stringify(entry.oldValue)
                             : String(entry.oldValue)}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
+                        <td className="px-4 py-2 text-sm text-gray-600" data-label="New Value">
                           {typeof entry.newValue === "object"
                             ? JSON.stringify(entry.newValue)
                             : String(entry.newValue)}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm" data-label="Changed By">
                           {entry.changedBy?.name || "Unknown"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm" data-label="Date">
                           {new Date(entry.changedAt).toLocaleString()}
                         </td>
                       </tr>

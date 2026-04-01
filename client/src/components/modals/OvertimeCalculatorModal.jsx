@@ -231,8 +231,8 @@ const OvertimeCalculatorModal = ({ onClose }) => {
                 </div>
 
                 {/* Detailed Table */}
-                <div className="overflow-x-auto border rounded-lg">
-                  <table className="min-w-full">
+                <div className="responsive-table-shell rounded-lg border">
+                  <table className="responsive-data-table min-w-full">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
@@ -247,16 +247,16 @@ const OvertimeCalculatorModal = ({ onClose }) => {
                     <tbody className="divide-y divide-gray-200">
                       {overtimeData.data.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm">
+                          <td className="px-4 py-2 text-sm" data-label="Date">
                             {format(new Date(item.date), 'MMM dd, yyyy')}
                           </td>
-                          <td className="px-4 py-2 text-sm">{item.workHours.toFixed(2)}</td>
-                          <td className="px-4 py-2 text-sm">{item.regularHours.toFixed(2)}</td>
-                          <td className="px-4 py-2 text-sm font-medium text-orange-600">
+                          <td className="px-4 py-2 text-sm" data-label="Work Hours">{item.workHours.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-sm" data-label="Regular">{item.regularHours.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-sm font-medium text-orange-600" data-label="Overtime">
                             {item.overtime.toFixed(2)}
                           </td>
-                          <td className="px-4 py-2 text-sm">{item.rate.toFixed(2)}x</td>
-                          <td className="px-4 py-2 text-sm">
+                          <td className="px-4 py-2 text-sm" data-label="Rate">{item.rate.toFixed(2)}x</td>
+                          <td className="px-4 py-2 text-sm" data-label="Type">
                             <span className={`px-2 py-1 rounded-full text-xs ${
                               item.isHoliday ? 'bg-red-100 text-red-700' :
                               item.isWeekend ? 'bg-purple-100 text-purple-700' :
@@ -267,7 +267,7 @@ const OvertimeCalculatorModal = ({ onClose }) => {
                               {getRateMultiplier(item)}
                             </span>
                           </td>
-                          <td className="px-4 py-2 text-sm font-medium">
+                          <td className="px-4 py-2 text-sm font-medium" data-label="Amount">
                             ₹{item.calculatedAmount.toFixed(2)}
                           </td>
                         </tr>

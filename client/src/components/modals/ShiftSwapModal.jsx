@@ -182,9 +182,9 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-6 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+      <div className="relative my-6 mx-auto w-full max-w-2xl rounded-xl border bg-white p-4 shadow-lg sm:p-5">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold flex items-center">
             <FaExchangeAlt className="mr-2 text-primary-600" />
             Shift Swap Request
@@ -210,7 +210,7 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div
             className={`flex items-center ${step >= 1 ? "text-primary-600" : "text-gray-400"}`}
           >
@@ -226,7 +226,7 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
             <span className="ml-2 text-sm">Select Colleague</span>
           </div>
           <div
-            className={`flex-1 h-0.5 mx-4 ${step >= 2 ? "bg-primary-600" : "bg-gray-300"}`}
+            className={`hidden h-0.5 flex-1 mx-4 sm:block ${step >= 2 ? "bg-primary-600" : "bg-gray-300"}`}
           />
           <div
             className={`flex items-center ${step >= 2 ? "text-primary-600" : "text-gray-400"}`}
@@ -289,7 +289,7 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
             <div className="bg-green-50 p-4 rounded-lg">
               <p className="font-medium text-green-800 mb-2">Swap Details</p>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs text-gray-500">Your Shift</p>
                   <p className="font-medium">{shift.name}</p>
@@ -356,7 +356,7 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
             <div className="space-y-2">
               {swapRequests.map((request) => (
                 <div key={request._id} className="bg-gray-50 p-3 rounded-lg">
-                  <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-medium">
                         Swap with {request.requestedWith?.name}
@@ -372,7 +372,7 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
                     {getStatusBadge(request.status)}
                   </div>
                   {(isAdmin || isManager) && request.status === "pending" && (
-                    <div className="flex space-x-2 mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <Button
                         onClick={() =>
                           setActionConfirm({
@@ -408,24 +408,24 @@ const ShiftSwapModal = ({ shift, onClose, onSuccess }) => {
         )}
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 mt-6">
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           {step > 1 && (
             <Button
               type="button"
               onClick={() => setStep(1)}
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto"
             >
               Back
             </Button>
           )}
-          <Button type="button" onClick={onClose} className="btn-secondary">
+          <Button type="button" onClick={onClose} className="btn-secondary w-full sm:w-auto">
             Cancel
           </Button>
           {step === 2 && (
             <Button
               onClick={handleSubmit}
               disabled={loading || !currentAssignment}
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto"
             >
               {loading ? "Sending..." : "Send Swap Request"}
             </Button>
